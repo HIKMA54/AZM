@@ -3,7 +3,9 @@
     <uses-permission
     android:name="android.permission.PACKAGE_USAGE_STATS"
     />
-    
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -25,5 +27,16 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+        <service
+            android:name="com.azm.background.AzmMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="behavioral wellbeing monitoring" />
+        </service>
+        <service
+            android:name="com.azm.background.AzmTaskService"
+            android:exported="false" />
     </application>
 </manifest>

@@ -13,27 +13,19 @@ export function getDb(): DB {
   return db;
 }
 
-/**
- * Normalizes an op-sqlite result into a plain array of row objects.
- * Different op-sqlite versions have returned `rows` either as a plain array or
- * as `{ _array }`; this handles both so the rest of the code never cares.
- */
+/** Normalizes an op-sqlite result into a plain array of row objects. */
 export function rowsOf<T = any>(result: any): T[] {
-  const r = result?.rows;
-  if (!r) return [];
-  if (Array.isArray(r)) return r as T[];
-  if (Array.isArray(r._array)) return r._array as T[];
-  return [];
+  return result?.rows ?? [];
 }
 
 /** Runs a query and returns typed rows. */
 export function query<T = any>(sql: string, params: any[] = []): T[] {
-  return rowsOf<T>(getDb().execute(sql, params));
+  return rowsOf<T>(getDb().executeSync(sql, params));
 }
 
 /** Runs a write statement and returns the number of rows affected. */
 export function run(sql: string, params: any[] = []): number {
-  const result: any = getDb().execute(sql, params);
+  const result = getDb().executeSync(sql, params);
   return result?.rowsAffected ?? 0;
 }
 
@@ -43,13 +35,13 @@ export function run(sql: string, params: any[] = []): number {
  */
 export function transaction<T>(work: () => T): T {
   const database = getDb();
-  database.execute('BEGIN');
+  database.executeSync('BEGIN');
   try {
     const out = work();
-    database.execute('COMMIT');
+    database.executeSync('COMMIT');
     return out;
   } catch (e) {
-    database.execute('ROLLBACK');
+    database.executeSync('ROLLBACK');
     throw e;
   }
 }
@@ -63,20 +55,20 @@ export function transaction<T>(work: () => T): T {
 export function initDatabase(): void {
   const database = getDb();
 
-  database.execute('PRAGMA journal_mode = WAL'); // better concurrent read/write
-  database.execute('PRAGMA foreign_keys = ON');
+  database.executeSync('PRAGMA journal_mode = WAL'); // better concurrent read/write
+  database.executeSync('PRAGMA foreign_keys = ON');
 
   const current =
-    (rowsOf<{ user_version: number }>(database.execute('PRAGMA user_version'))[0]
+    (rowsOf<{ user_version: number }>(database.executeSync('PRAGMA user_version'))[0]
       ?.user_version) ?? 0;
 
   if (current < SCHEMA_VERSION) {
     transaction(() => {
       for (const stmt of SCHEMA_STATEMENTS) {
-        database.execute(stmt);
+        database.executeSync(stmt);
       }
       // PRAGMA can't be parameterized; SCHEMA_VERSION is a trusted integer.
-      database.execute(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+      database.executeSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     });
   }
 }
