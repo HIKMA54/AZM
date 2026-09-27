@@ -27,9 +27,15 @@ export default function AppNavigator() {
   return (
     <View style={styles.root}>
       <View style={styles.body}>
-        {tab === 'today' && <DashboardScreen />}
-        {tab === 'insights' && <InsightsScreen />}
-        {tab === 'settings' && <SettingsScreen />}
+        <View style={[styles.screenWrap, tab !== 'today' && styles.hidden]}>
+          <DashboardScreen />
+        </View>
+        <View style={[styles.screenWrap, tab !== 'insights' && styles.hidden]}>
+          <InsightsScreen />
+        </View>
+        <View style={[styles.screenWrap, tab !== 'settings' && styles.hidden]}>
+          <SettingsScreen />
+        </View>
       </View>
 
       <View style={[styles.tabBar, { paddingBottom: insets.bottom + space.sm }]}>
@@ -56,6 +62,8 @@ export default function AppNavigator() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   body: { flex: 1 },
+  screenWrap: { flex: 1 },
+  hidden: { display: 'none' },
   tabBar: {
     flexDirection: 'row',
     borderTopWidth: 1,
