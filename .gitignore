@@ -2,7 +2,13 @@
 #
 .DS_Store
 
+# Claude Code (local settings and permissions)
 .claude/
+
+# Environment / secrets (Azm has none today; this stops one being committed later)
+.env
+.env.*
+!.env.example
 # Xcode
 #
 build/
@@ -36,6 +42,11 @@ local.properties
 !debug.keystore
 keystore.properties
 .kotlin/
+*.apk
+*.aab
+
+# Generated JS bundle for release builds (rebuilt by Gradle; ~1 MB)
+android/app/src/main/assets/index.android.bundle
 
 # node.js
 #
@@ -44,11 +55,6 @@ npm-debug.log
 yarn-error.log
 
 # fastlane
-#
-# It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
-# screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/
 
 **/fastlane/report.xml
 **/fastlane/Preview.html
@@ -57,6 +63,9 @@ yarn-error.log
 
 # Bundle artifact
 *.jsbundle
+
+# Windows
+Thumbs.db
 
 # Ruby / CocoaPods
 **/Pods/
