@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { initDatabase } from './src/database/db';
 import { seedDefaultSettings } from './src/database/settingsRepo';
+import { primeSystemExclusions } from './src/database/trackedAppsRepo';
 import AppNavigator from './src/navigation/AppNavigator';
 import { InterventionHost } from './src/interventions/InterventionHost';
 
@@ -12,13 +13,19 @@ export default function App() {
   const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      initDatabase();
-      seedDefaultSettings();
-      setDbReady(true);
-    } catch (e: any) {
-      setDbError(e?.message ?? String(e));
-    }
+    (async () => {
+      try {
+        initDatabase();
+        seedDefaultSettings();
+        // Resolves and caches the home launcher / System UI / Azm exclusion
+        // set before anything reads it, so the very first detection run and
+        // Today's first render are already scoped correctly.
+        await primeSystemExclusions();
+        setDbReady(true);
+      } catch (e: any) {
+        setDbError(e?.message ?? String(e));
+      }
+    })();
   }, []);
 
   if (dbError) {

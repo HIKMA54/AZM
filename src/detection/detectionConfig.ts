@@ -9,6 +9,13 @@
 export const BASELINE_WINDOW_DAYS = 14;
 
 /**
+ * Furthest back a single ingestion run asks the OS for events. Bounds the query
+ * after a long gap (e.g. app reinstalled weeks later) instead of reading
+ * everything since the last checkpoint.
+ */
+export const MAX_INGEST_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+/**
  * Days of data required before baseline-dependent rules (impulse opens, long
  * session) are trusted. Below this, Azm is in its "learning phase" and holds
  * those comparisons back rather than flag against an unstable "usual".

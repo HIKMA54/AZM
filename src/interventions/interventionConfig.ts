@@ -5,9 +5,6 @@ import { InterventionTrigger } from '../database/schema';
  * reduce. These are deliberate anti-nag limits, documented and tunable.
  */
 
-/** Minimum minutes between any two interventions. */
-export const INTERVENTION_COOLDOWN_MIN = 30;
-
 /** Hard ceiling on interventions per day, regardless of how much fires. */
 export const MAX_INTERVENTIONS_PER_DAY = 8;
 
@@ -22,3 +19,20 @@ export const TRIGGER_PRIORITY: InterventionTrigger[] = [
   'late_night',
   'daily_goal',
 ];
+
+/**
+ * Minutes of quiet after an intervention, chosen by the user's last response:
+ * a taken break earns the longest rest, while choosing to keep scrolling brings
+ * Azm back sooner.
+ */
+export const COOLDOWN_AFTER_BREAK_MIN = 45;
+export const COOLDOWN_AFTER_CONTINUE_MIN = 15;
+export const COOLDOWN_DEFAULT_MIN = 30;
+
+/**
+ * Delay (seconds) before "keep scrolling" can be tapped. Starts at the base and
+ * grows by one step for each intervention already shown today, up to the cap.
+ */
+export const FRICTION_BASE_SEC = 5;
+export const FRICTION_STEP_SEC = 10;
+export const FRICTION_MAX_SEC = 60;

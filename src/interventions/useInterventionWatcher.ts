@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { UsageStatsService } from '../services/UsageStats';
-import { sessionize } from '../detection/sessionize';
-import { saveSessions } from '../database/sessionsRepo';
+import { ingestRecentEvents } from '../detection/ingest';
+import { refreshRollups } from '../detection/rollups';
 import { runDetection } from '../detection/engine';
 import {
   decideIntervention,
@@ -35,9 +35,8 @@ export function useInterventionWatcher() {
     try {
       if (!(await UsageStatsService.hasUsageAccess())) return;
       const end = Date.now();
-      saveSessions(
-        sessionize(await UsageStatsService.queryEvents(end - 86400000, end), end),
-      );
+      const { touchedDates } = await ingestRecentEvents(end);
+      if (touchedDates.length > 0) refreshRollups(touchedDates);
       const decision = decideIntervention(runDetection(end), end);
       if (decision.shouldIntervene) {
         setActive({ decision, id: presentIntervention(decision, end) });

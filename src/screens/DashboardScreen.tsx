@@ -3,9 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Screen, Card, SectionLabel, StatTile, Pill, Divider } from '../components/ui';
 import { colors, space, radius, type, risk as riskTones } from '../theme/theme';
 import { useDashboard } from '../hooks/useDashboard';
+import { WhyModal } from '../components/WhyModal';
+import { useGoToTab } from '../navigation/tabs';
 
 export default function DashboardScreen() {
   const { phase, model, refresh, greeting, openUsageSettings } = useDashboard();
+  const [whyOpen, setWhyOpen] = React.useState(false);
+  const goToTab = useGoToTab();
 
   if (phase === 'needsPermission') {
     return (
@@ -72,6 +76,10 @@ export default function DashboardScreen() {
         </View>
       </Card>
 
+      <TouchableOpacity onPress={() => setWhyOpen(true)}>
+        <Text style={styles.whyLink}>Why you saw this ›</Text>
+      </TouchableOpacity>
+
       {/* What stood out */}
       <SectionLabel>What stood out</SectionLabel>
       {model.insights.length === 0 ? (
@@ -117,11 +125,20 @@ export default function DashboardScreen() {
       <TouchableOpacity style={styles.ghostBtn} onPress={refresh}>
         <Text style={styles.ghostBtnText}>Refresh</Text>
       </TouchableOpacity>
+      <WhyModal
+        visible={whyOpen}
+        onClose={() => setWhyOpen(false)}
+        onAdjustSettings={() => {
+          setWhyOpen(false);
+          goToTab('settings');
+        }}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  whyLink: { color: colors.accent, fontWeight: '600', marginTop: space.xxl },
   header: { marginTop: space.sm, marginBottom: space.md },
   eyebrow: { marginTop: space.sm },
   headline: { marginTop: space.xs },

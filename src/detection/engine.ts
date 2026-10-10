@@ -1,7 +1,8 @@
 import { query } from '../database/db';
 import { toLocalDate } from '../utils/datetime';
 import { getSetting, getSettingNumber } from '../database/settingsRepo';
-import { refreshRollups } from './rollups';
+import { getScopedApps } from '../database/trackedAppsRepo';
+import { getOpensForApp } from '../database/sessionsRepo';
 import { refreshBaselines, getBaseline, getLearningPhase } from './baselines';
 import {
   LEARNING_PHASE_DAYS,
@@ -25,33 +26,6 @@ export interface DetectionResult {
   rules: RuleResult[]; // every rule evaluated (fired or not) — for transparency
   firedRules: RuleResult[];
   withinQuietHours: boolean;
-}
-
-/**
- * Apps in scope for detection: the user's tracked apps if any have been chosen,
- * otherwise every app Azm has actually observed. The fallback means detection
- * is demonstrable from the very first run, before the Tracked Apps screen has
- * been used.
- */
-function getDetectionApps(): string[] {
-  const tracked = query<{ package_name: string }>(
-    'SELECT package_name FROM tracked_apps WHERE is_tracked = 1',
-  );
-  if (tracked.length > 0) return tracked.map(r => r.package_name);
-
-  const observed = query<{ package_name: string }>(
-    'SELECT DISTINCT package_name FROM sessions',
-  );
-  return observed.map(r => r.package_name);
-}
-
-function getOpensForApp(pkg: string, date: string): number {
-  return (
-    query<{ n: number }>(
-      'SELECT COUNT(*) AS n FROM sessions WHERE package_name = ? AND local_date = ?',
-      [pkg, date],
-    )[0]?.n ?? 0
-  );
 }
 
 function getLongestSessionMs(pkg: string, date: string): number {
@@ -118,11 +92,16 @@ function isWithinQuietHours(now: number): boolean {
 /**
  * Runs Azm's rule-based detection for `now`.
  *
- * Pipeline: refresh rollups -> refresh baselines -> gather today's facts ->
- * evaluate every rule -> derive an overall risk level. Per-app rules (impulse
- * opens, long session) run for each app in scope against that app's own
- * baseline; aggregate rules (late-night, daily goal) run once across all apps
- * in scope.
+ * Pipeline: refresh baselines -> gather today's facts -> evaluate every rule
+ * -> derive an overall risk level. Per-app rules (impulse opens, long session)
+ * run for each app in scope against that app's own baseline; aggregate rules
+ * (late-night, daily goal) run once across all apps in scope.
+ *
+ * Rollups are NOT refreshed here — the caller's ingestion step
+ * (ingestRecentEvents + refreshRollups(touchedDates)) already did that for
+ * whatever days it just read, before calling this. Rebuilding the whole
+ * rollup table on every detection run would undo the point of a scoped,
+ * checkpointed ingest.
  *
  * This function only reads and computes. It stores nothing and shows nothing —
  * deciding whether to actually surface an intervention (and respecting quiet
@@ -130,12 +109,11 @@ function isWithinQuietHours(now: number): boolean {
  * rule outcomes and a quiet-hours flag rather than acting on them here.
  */
 export function runDetection(now: number = Date.now()): DetectionResult {
-  refreshRollups();
   refreshBaselines(now);
 
   const date = toLocalDate(now);
   const learningPhase = getLearningPhase();
-  const apps = getDetectionApps();
+  const apps = getScopedApps();
   const lateHour =
     getSettingNumber('late_night_start_hour') ?? DEFAULT_LATE_NIGHT_HOUR;
   const goalMin =

@@ -19,7 +19,9 @@ export function hourOfDay(epochMs: number): number {
   return new Date(epochMs).getHours();
 }
 
-/** Today's local date string. */
-export function today(): string {
-  return toLocalDate(Date.now());
+/** Epoch ms of local midnight at the start of the day containing epochMs. */
+export function startOfLocalDay(epochMs: number): number {
+  const d = new Date(epochMs);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
 }

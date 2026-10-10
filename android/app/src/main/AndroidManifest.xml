@@ -19,6 +19,16 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!--
+          Lets UsageStatsModule.resolveHomePackage() find the device's default
+          home app via PackageManager.resolveActivity, so it can be excluded
+          from the picker and from every usage figure without hardcoding a
+          manufacturer's launcher package name.
+        -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
     </queries>
 
     <application

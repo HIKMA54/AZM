@@ -5,6 +5,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
@@ -29,6 +30,66 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
     override fun getName(): String = "UsageStats"
+
+    companion object {
+        private const val SYSTEMUI_PACKAGE = "com.android.systemui"
+    }
+
+    /**
+     * Resolves the device's current default home app via PackageManager, the
+     * same mechanism Android itself uses to decide what the home button opens.
+     * Done at runtime (never hardcoded) so it works across manufacturers/launchers.
+     * Requires the CATEGORY_HOME <queries> entry on API 30+; returns null rather
+     * than throwing if it can't be resolved.
+     */
+    private fun resolveHomePackage(): String? {
+        return try {
+            val pm = reactContext.packageManager
+            val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val resolved = pm.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            resolved?.activityInfo?.packageName
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Packages that must never be tracked or counted as usage, regardless of
+     * what the user has picked: the device's home launcher (every return to
+     * home reads as an "open" otherwise), System UI, and Azm itself.
+     */
+    @ReactMethod
+    fun getSystemExcludedPackages(promise: Promise) {
+        try {
+            val out = Arguments.createArray()
+            resolveHomePackage()?.let { out.pushString(it) }
+            out.pushString(SYSTEMUI_PACKAGE)
+            out.pushString(reactContext.packageName)
+            promise.resolve(out)
+        } catch (e: Exception) {
+            promise.reject("GET_EXCLUDED_FAILED", e)
+        }
+    }
+
+    /**
+     * On-demand display-name resolution for a single package, used only as a
+     * fallback when no cached name exists (see trackedAppsRepo's name map).
+     * Resolves the true app-level label, not an activity label, so it matches
+     * what the Tracked Apps picker shows. Null if the package is uninstalled
+     * or otherwise can't be resolved.
+     */
+    @ReactMethod
+    fun getAppLabel(packageName: String, promise: Promise) {
+        try {
+            val pm = reactContext.packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            promise.resolve(pm.getApplicationLabel(appInfo).toString())
+        } catch (e: PackageManager.NameNotFoundException) {
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("GET_APP_LABEL_FAILED", e)
+        }
+    }
 
     /**
      * PACKAGE_USAGE_STATS is a "special" permission: it cannot be requested with
@@ -106,11 +167,20 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
      * Querying LAUNCHER activities avoids the QUERY_ALL_PACKAGES permission,
      * which keeps Azm's privacy posture clean: it only ever sees apps that
      * appear in the launcher, never a full package inventory.
+     *
+     * The device's home app, System UI, and Azm itself are excluded here too
+     * (not just in JS): returning to the home screen isn't "using an app", so
+     * it must never even be offered as something to track.
      */
     @ReactMethod
     fun getLaunchableApps(promise: Promise) {
         try {
             val pm = reactContext.packageManager
+            val excluded = HashSet<String>()
+            resolveHomePackage()?.let { excluded.add(it) }
+            excluded.add(SYSTEMUI_PACKAGE)
+            excluded.add(reactContext.packageName)
+
             val intent = Intent(Intent.ACTION_MAIN, null)
                 .addCategory(Intent.CATEGORY_LAUNCHER)
             val resolveInfos = pm.queryIntentActivities(intent, 0)
@@ -118,11 +188,18 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
             val seen = HashSet<String>()
             for (ri in resolveInfos) {
                 val pkg = ri.activityInfo.packageName
-                if (pkg == reactContext.packageName) continue
+                if (pkg in excluded) continue
                 if (!seen.add(pkg)) continue
                 val map = Arguments.createMap()
                 map.putString("packageName", pkg)
-                map.putString("appName", ri.loadLabel(pm).toString())
+                // App-level label (matches getAppLabel/getApplicationLabel), not the
+                // activity's own label, so the picker and every other screen agree.
+                val label = try {
+                    pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+                } catch (e: PackageManager.NameNotFoundException) {
+                    ri.loadLabel(pm).toString()
+                }
+                map.putString("appName", label)
                 out.pushMap(map)
             }
             promise.resolve(out)

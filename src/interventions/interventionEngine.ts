@@ -2,58 +2,50 @@ import { DetectionResult } from '../detection/engine';
 import { RuleResult } from '../detection/rules';
 import { InterventionResponse } from '../database/schema';
 import {
-  INTERVENTION_COOLDOWN_MIN,
   MAX_INTERVENTIONS_PER_DAY,
   TRIGGER_PRIORITY,
+  COOLDOWN_AFTER_BREAK_MIN,
+  COOLDOWN_AFTER_CONTINUE_MIN,
+  COOLDOWN_DEFAULT_MIN,
+  FRICTION_BASE_SEC,
+  FRICTION_STEP_SEC,
+  FRICTION_MAX_SEC,
 } from './interventionConfig';
 import {
   getLastInterventionTime,
+  getLastResponse,
   countInterventionsSince,
+  countInterventionsToday,
   logIntervention,
 } from './interventionsRepo';
+import { startOfLocalDay } from '../utils/datetime';
+import { displayAppName } from '../utils/appNames';
+import { getTrackedNameMap } from '../database/trackedAppsRepo';
 
-/**
- * How forcefully to intervene:
- *   none      -> don't
- *   gentle    -> a dismissable reminder (low friction)
- *   interrupt -> a full-screen prompt with an explicit choice
- *
- * Level is chosen from risk alone and never auto-escalates past 'interrupt'.
- * Harder measures (temporary lockouts) are intentionally left out of automatic
- * escalation: per Azm's design, stronger friction is user-controlled, not
- * something the app ramps up silently on someone.
- */
 export type InterventionLevel = 'none' | 'gentle' | 'interrupt';
 
 export interface InterventionOption {
   label: string;
   response: InterventionResponse;
+  /** Seconds the option is held before it can be tapped (0 = immediate). */
+  delaySec: number;
 }
 
 export interface InterventionDecision {
   shouldIntervene: boolean;
-  reason: string; // why it did/didn't fire — also useful on the transparency screen
+  reason: string;
   level: InterventionLevel;
   trigger: RuleResult | null;
+  /** Every rule that fired for this decision, for the "why" view. */
+  firedRules: RuleResult[];
   packageName: string | null;
   title: string;
   body: string;
   options: InterventionOption[];
+  /** Friction applied to "keep scrolling" this time (for copy/telemetry). */
+  frictionSec: number;
 }
 
-function startOfDayMs(now: number): number {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
-function shortPkg(p: string | null): string {
-  if (!p) return 'an app';
-  const parts = p.split('.');
-  return parts[parts.length - 1];
-}
-
-/** Chooses which fired rule the intervention speaks to (see TRIGGER_PRIORITY). */
 function pickPrimary(fired: RuleResult[]): RuleResult | null {
   for (const t of TRIGGER_PRIORITY) {
     const hit = fired.find(r => r.type === t);
@@ -63,12 +55,37 @@ function pickPrimary(fired: RuleResult[]): RuleResult | null {
 }
 
 /**
- * Calm, specific copy that names the actual numbers behind the prompt. The tone
- * is a nudge with an out, never a scold — the user always keeps agency.
+ * Cooldown depends on the LAST response: a taken break earns real quiet, while
+ * refusing it brings Azm back sooner. This is the consequence half of the
+ * breach model — the friction on the button is the other half.
  */
+function cooldownMinutes(): number {
+  switch (getLastResponse()) {
+    case 'accepted_break':
+      return COOLDOWN_AFTER_BREAK_MIN;
+    case 'kept_scrolling':
+      return COOLDOWN_AFTER_CONTINUE_MIN;
+    default:
+      return COOLDOWN_DEFAULT_MIN;
+  }
+}
+
+/**
+ * Escalating friction: the "keep scrolling" delay grows with each breach already
+ * shown today, capped so it never becomes a de-facto lockout. Leaving is always
+ * instant; only continuing costs time, and it costs more the more it recurs.
+ */
+function frictionSeconds(now: number): number {
+  const priorToday = countInterventionsToday(now);
+  return Math.min(
+    FRICTION_MAX_SEC,
+    FRICTION_BASE_SEC + priorToday * FRICTION_STEP_SEC,
+  );
+}
+
 function copyFor(trigger: RuleResult): { title: string; body: string } {
   const d = trigger.detail;
-  const app = shortPkg(trigger.packageName);
+  const app = displayAppName(trigger.packageName, getTrackedNameMap());
   switch (trigger.type) {
     case 'daily_goal':
       return {
@@ -91,24 +108,22 @@ function copyFor(trigger: RuleResult): { title: string; body: string } {
         body: `It's past ${d.sinceHour}:00 and you're still scrolling. Maybe rest your eyes for tonight?`,
       };
     default:
-      return {
-        title: 'Time for a break?',
-        body: 'You might be using this more than you meant to.',
-      };
+      return { title: 'Time for a break?', body: 'You might be using this more than you meant to.' };
   }
 }
 
-function optionsFor(level: InterventionLevel): InterventionOption[] {
+function optionsFor(level: InterventionLevel, frictionSec: number): InterventionOption[] {
+  // "Take a break" is always immediate; continuing carries the friction delay.
   if (level === 'interrupt') {
     return [
-      { label: 'Take a break', response: 'accepted_break' },
-      { label: 'Keep scrolling', response: 'kept_scrolling' },
-      { label: 'Not now', response: 'snoozed' },
+      { label: 'Take a break', response: 'accepted_break', delaySec: 0 },
+      { label: 'Keep scrolling', response: 'kept_scrolling', delaySec: frictionSec },
+      { label: 'Not now', response: 'snoozed', delaySec: Math.min(frictionSec, 5) },
     ];
   }
   return [
-    { label: 'Take a break', response: 'accepted_break' },
-    { label: 'Dismiss', response: 'dismissed' },
+    { label: 'Take a break', response: 'accepted_break', delaySec: 0 },
+    { label: 'Keep scrolling', response: 'kept_scrolling', delaySec: frictionSec },
   ];
 }
 
@@ -119,12 +134,9 @@ function levelForRisk(risk: DetectionResult['riskLevel']): InterventionLevel {
 }
 
 /**
- * Decides whether and how to intervene given a detection result. Pure aside from
- * reading the intervention log for cooldown/cap checks — it writes nothing, so
- * it's safe to call freely (e.g. to preview on the transparency screen).
- *
- * Gating order: something must have fired, it must not be quiet hours, the
- * cooldown must have elapsed, and the daily cap must not be hit.
+ * Decides whether and how to intervene. Reads the log for cooldown/cap/friction
+ * but writes nothing, so it is safe to call freely. Gating order: a rule fired,
+ * not quiet hours, the response-based cooldown elapsed, the daily cap not hit.
  */
 export function decideIntervention(
   result: DetectionResult,
@@ -135,20 +147,22 @@ export function decideIntervention(
     reason,
     level: 'none',
     trigger: null,
+    firedRules: [],
     packageName: null,
     title: '',
     body: '',
     options: [],
+    frictionSec: 0,
   });
 
   if (result.firedRules.length === 0) return none('no rules fired');
   if (result.withinQuietHours) return none('within quiet hours');
 
   const last = getLastInterventionTime();
-  if (last != null && now - last < INTERVENTION_COOLDOWN_MIN * 60 * 1000) {
-    return none('cooldown active');
-  }
-  if (countInterventionsSince(startOfDayMs(now)) >= MAX_INTERVENTIONS_PER_DAY) {
+  const cooldownMs = cooldownMinutes() * 60 * 1000;
+  if (last != null && now - last < cooldownMs) return none('cooldown active');
+
+  if (countInterventionsSince(startOfLocalDay(now)) >= MAX_INTERVENTIONS_PER_DAY) {
     return none('daily cap reached');
   }
 
@@ -158,25 +172,22 @@ export function decideIntervention(
   const trigger = pickPrimary(result.firedRules);
   if (!trigger) return none('no primary trigger');
 
+  const frictionSec = frictionSeconds(now);
   const { title, body } = copyFor(trigger);
   return {
     shouldIntervene: true,
-    reason: `risk ${result.riskLevel}, primary ${trigger.type}`,
+    reason: `risk ${result.riskLevel}, primary ${trigger.type}, friction ${frictionSec}s`,
     level,
     trigger,
+    firedRules: result.firedRules,
     packageName: trigger.packageName,
     title,
     body,
-    options: optionsFor(level),
+    options: optionsFor(level, frictionSec),
+    frictionSec,
   };
 }
 
-/**
- * Records that a decided intervention was shown, returning its log id so the
- * caller can attach the user's response later via recordResponse(). Writing at
- * show-time (not response-time) is what starts the cooldown and makes an
- * ignored prompt still countable.
- */
 export function presentIntervention(
   decision: InterventionDecision,
   now: number = Date.now(),

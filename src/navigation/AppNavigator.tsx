@@ -5,8 +5,7 @@ import { colors, space, type } from '../theme/theme';
 import DashboardScreen from '../screens/DashboardScreen';
 import InsightsScreen from '../screens/InsightsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-
-type TabKey = 'today' | 'insights' | 'settings';
+import { TabContext, TabKey } from './tabs';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'today', label: 'Today' },
@@ -25,37 +24,39 @@ export default function AppNavigator() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.root}>
-      <View style={styles.body}>
-        <View style={[styles.screenWrap, tab !== 'today' && styles.hidden]}>
-          <DashboardScreen />
+    <TabContext.Provider value={setTab}>
+      <View style={styles.root}>
+        <View style={styles.body}>
+          <View style={[styles.screenWrap, tab !== 'today' && styles.hidden]}>
+            <DashboardScreen />
+          </View>
+          <View style={[styles.screenWrap, tab !== 'insights' && styles.hidden]}>
+            <InsightsScreen />
+          </View>
+          <View style={[styles.screenWrap, tab !== 'settings' && styles.hidden]}>
+            <SettingsScreen />
+          </View>
         </View>
-        <View style={[styles.screenWrap, tab !== 'insights' && styles.hidden]}>
-          <InsightsScreen />
-        </View>
-        <View style={[styles.screenWrap, tab !== 'settings' && styles.hidden]}>
-          <SettingsScreen />
-        </View>
-      </View>
 
-      <View style={[styles.tabBar, { paddingBottom: insets.bottom + space.sm }]}>
-        {TABS.map(t => {
-          const active = t.key === tab;
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={styles.tab}
-              onPress={() => setTab(t.key)}
-              activeOpacity={0.7}>
-              <View style={[styles.dot, active && styles.dotActive]} />
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+        <View style={[styles.tabBar, { paddingBottom: insets.bottom + space.sm }]}>
+          {TABS.map(t => {
+            const active = t.key === tab;
+            return (
+              <TouchableOpacity
+                key={t.key}
+                style={styles.tab}
+                onPress={() => setTab(t.key)}
+                activeOpacity={0.7}>
+                <View style={[styles.dot, active && styles.dotActive]} />
+                <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
-    </View>
+    </TabContext.Provider>
   );
 }
 

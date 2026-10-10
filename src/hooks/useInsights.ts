@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { UsageStatsService } from '../services/UsageStats';
-import { sessionize } from '../detection/sessionize';
-import { saveSessions } from '../database/sessionsRepo';
+import { ingestRecentEvents } from '../detection/ingest';
+import { getTrackedNameMap } from '../database/trackedAppsRepo';
 import { refreshRollups } from '../detection/rollups';
 import { refreshBaselines } from '../detection/baselines';
 import {
@@ -13,11 +13,7 @@ import {
   WeekApp,
 } from '../detection/history';
 import { getBreakAcceptanceStats } from '../interventions/interventionsRepo';
-
-function prettyName(pkg: string): string {
-  const last = pkg.split('.').pop() ?? pkg;
-  return last.charAt(0).toUpperCase() + last.slice(1);
-}
+import { resolveAppName } from '../utils/appNames';
 
 export interface InsightsModel {
   series: DaySeries[];
@@ -37,22 +33,26 @@ export function useInsights() {
       // insights still render from stored data if access isn't granted.
       try {
         if (await UsageStatsService.hasUsageAccess()) {
-          const end = Date.now();
-          saveSessions(
-            sessionize(await UsageStatsService.queryEvents(end - 86400000, end), end),
-          );
+          const { touchedDates } = await ingestRecentEvents(Date.now());
+          if (touchedDates.length > 0) refreshRollups(touchedDates);
         }
       } catch {}
 
-      refreshRollups();
       refreshBaselines();
 
       const stats = getBreakAcceptanceStats();
+      const trackedNames = getTrackedNameMap();
+      const topApps = await Promise.all(
+        getTopAppsThisWeek().map(async a => ({
+          ...a,
+          name: await resolveAppName(a.packageName, trackedNames),
+        })),
+      );
       setModel({
         series: getWeeklySeries(),
         summary: getWeeklySummary(),
         breaks: { accepted: stats.accepted, total: stats.total },
-        topApps: getTopAppsThisWeek().map(a => ({ ...a, name: prettyName(a.packageName) })),
+        topApps,
       });
     } finally {
       setLoading(false);

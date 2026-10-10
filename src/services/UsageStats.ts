@@ -42,4 +42,18 @@ export const UsageStatsService = {
     const raw = await UsageStats.getLaunchableApps();
     return raw as AppInfo[];
   },
+
+  /**
+   * Packages that must never be tracked or counted, resolved at runtime: the
+   * device's current home app, System UI, and Azm itself.
+   */
+  async getSystemExcludedPackages(): Promise<string[]> {
+    const raw = await UsageStats.getSystemExcludedPackages();
+    return raw as string[];
+  },
+
+  /** On-demand display-name lookup; null if the package can't be resolved. */
+  async getAppLabel(packageName: string): Promise<string | null> {
+    return UsageStats.getAppLabel(packageName);
+  },
 };

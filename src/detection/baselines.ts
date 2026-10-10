@@ -1,5 +1,6 @@
 import { query, run } from '../database/db';
 import { AppBaselineRow } from '../database/schema';
+import { getSystemExclusions } from '../database/trackedAppsRepo';
 import { toLocalDate } from '../utils/datetime';
 import { BASELINE_WINDOW_DAYS, LEARNING_PHASE_DAYS } from './detectionConfig';
 
@@ -24,6 +25,17 @@ function dateNDaysAgo(now: number, n: number): string {
 export function refreshBaselines(now: number = Date.now()): void {
   const windowStart = dateNDaysAgo(now, BASELINE_WINDOW_DAYS);
   const todayStr = toLocalDate(now);
+
+  // Same reasoning as refreshRollups(): drop any baseline row already stored
+  // for an excluded package, since the rebuild below won't touch a row it no
+  // longer produces.
+  const excluded = [...getSystemExclusions()];
+  if (excluded.length > 0) {
+    run(
+      `DELETE FROM app_baselines WHERE package_name IN (${excluded.map(() => '?').join(',')})`,
+      excluded,
+    );
+  }
 
   const rows = query<{
     package_name: string;

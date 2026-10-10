@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { UsageStatsService } from '../services/UsageStats';
-import { sessionize } from '../detection/sessionize';
-import { saveSessions } from '../database/sessionsRepo';
+import { ingestRecentEvents } from '../detection/ingest';
+import { refreshRollups } from '../detection/rollups';
 import { query } from '../database/db';
+import { getScopedApps, getTrackedNameMap } from '../database/trackedAppsRepo';
 import { toLocalDate } from '../utils/datetime';
 import { runDetection } from '../detection/engine';
 import { RiskLevel } from '../detection/rules';
 import { getBreakAcceptanceStats } from '../interventions/interventionsRepo';
+import { resolveAppName, displayAppName } from '../utils/appNames';
 
 export interface AppUsage {
   packageName: string;
@@ -30,11 +32,6 @@ export interface DashboardModel {
 
 export type DashboardPhase = 'loading' | 'needsPermission' | 'ready' | 'error';
 
-function prettyName(pkg: string): string {
-  const last = pkg.split('.').pop() ?? pkg;
-  return last.charAt(0).toUpperCase() + last.slice(1);
-}
-
 function timeOfDayGreeting(now: number): string {
   const h = new Date(now).getHours();
   if (h < 12) return 'Good morning';
@@ -43,9 +40,9 @@ function timeOfDayGreeting(now: number): string {
 }
 
 /** Turns a fired rule into one plain-language line for the dashboard. */
-function insightLine(rule: any): string {
+function insightLine(rule: any, trackedNames: Map<string, string>): string {
   const d = rule.detail ?? {};
-  const app = rule.packageName ? prettyName(rule.packageName) : 'an app';
+  const app = displayAppName(rule.packageName, trackedNames);
   switch (rule.type) {
     case 'daily_goal':
       return `You've passed your ${d.goalMin}-minute goal — ${d.usedMin} minutes so far.`;
@@ -101,29 +98,51 @@ export function useDashboard() {
       }
 
       const end = Date.now();
-      const events = await UsageStatsService.queryEvents(end - 86400000, end);
-      saveSessions(sessionize(events, end));
+      const { touchedDates } = await ingestRecentEvents(end);
+      if (touchedDates.length > 0) refreshRollups(touchedDates);
 
       const detection = runDetection(end);
       const date = toLocalDate(end);
+      const trackedNames = getTrackedNameMap();
 
-      const totals = query<{ opens: number; longest: number; total: number }>(
-        `SELECT COUNT(*) AS opens, MAX(duration_ms) AS longest, SUM(duration_ms) AS total
-         FROM sessions WHERE local_date = ?`,
-        [date],
-      )[0] ?? { opens: 0, longest: 0, total: 0 };
+      // Today's figures are scoped to the exact same app list detection just
+      // used — tracked apps only (or every observed app minus the home
+      // launcher/System UI/Azm, before anything's been tracked).
+      const scoped = getScopedApps();
+      const placeholders = scoped.map(() => '?').join(',');
 
-      const apps = query<{ packageName: string; opens: number; ms: number }>(
-        `SELECT package_name AS packageName, COUNT(*) AS opens, SUM(duration_ms) AS ms
-         FROM sessions WHERE local_date = ?
-         GROUP BY package_name ORDER BY ms DESC LIMIT 4`,
-        [date],
-      );
+      const totals =
+        scoped.length === 0
+          ? { opens: 0, longest: 0, total: 0 }
+          : query<{ opens: number; longest: number; total: number }>(
+              `SELECT COUNT(*) AS opens, MAX(duration_ms) AS longest, SUM(duration_ms) AS total
+               FROM sessions WHERE local_date = ? AND package_name IN (${placeholders})`,
+              [date, ...scoped],
+            )[0] ?? { opens: 0, longest: 0, total: 0 };
+
+      const apps =
+        scoped.length === 0
+          ? []
+          : query<{ packageName: string; opens: number; ms: number }>(
+              `SELECT package_name AS packageName, COUNT(*) AS opens, SUM(duration_ms) AS ms
+               FROM sessions WHERE local_date = ? AND package_name IN (${placeholders})
+               GROUP BY package_name ORDER BY ms DESC LIMIT 4`,
+              [date, ...scoped],
+            );
 
       const stats = getBreakAcceptanceStats();
       const { headline, subline } = headlineFor(
         detection.riskLevel,
         detection.learningPhase,
+      );
+
+      const topApps = await Promise.all(
+        apps.map(async a => ({
+          packageName: a.packageName,
+          name: await resolveAppName(a.packageName, trackedNames),
+          opens: a.opens,
+          minutes: Math.round((a.ms ?? 0) / 60000),
+        })),
       );
 
       setModel({
@@ -135,16 +154,11 @@ export function useDashboard() {
         longestMin: Math.round((totals.longest ?? 0) / 60000),
         totalMin: Math.round((totals.total ?? 0) / 60000),
         breaks: { accepted: stats.accepted, total: stats.total },
-        insights: detection.firedRules.map(insightLine),
-        topApps: apps.map(a => ({
-          packageName: a.packageName,
-          name: prettyName(a.packageName),
-          opens: a.opens,
-          minutes: Math.round((a.ms ?? 0) / 60000),
-        })),
+        insights: detection.firedRules.map(r => insightLine(r, trackedNames)),
+        topApps,
       });
       setPhase('ready');
-    } catch (e) {
+    } catch {
       setPhase('error');
     }
   }, []);

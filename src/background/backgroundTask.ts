@@ -1,8 +1,8 @@
 import { NativeModules } from 'react-native';
 import { UsageStatsService } from '../services/UsageStats';
-import { sessionize } from '../detection/sessionize';
 import { initDatabase } from '../database/db';
-import { saveSessions } from '../database/sessionsRepo';
+import { ingestRecentEvents } from '../detection/ingest';
+import { refreshRollups } from '../detection/rollups';
 import { runDetection } from '../detection/engine';
 import {
   decideIntervention,
@@ -26,9 +26,8 @@ export default async function backgroundTask(): Promise<void> {
     if (!(await UsageStatsService.hasUsageAccess())) return;
 
     const end = Date.now();
-    saveSessions(
-      sessionize(await UsageStatsService.queryEvents(end - 86400000, end), end),
-    );
+    const { touchedDates } = await ingestRecentEvents(end);
+    if (touchedDates.length > 0) refreshRollups(touchedDates);
 
     const decision = decideIntervention(runDetection(end), end);
     if (decision.shouldIntervene) {
