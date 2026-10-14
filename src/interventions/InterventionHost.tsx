@@ -4,5 +4,6 @@ import { InterruptModal } from '../components/InterruptModal';
 
 export function InterventionHost() {
   const { active, clear } = useInterventionWatcher();
-  return <InterruptModal active={active} onClose={clear} />;
+  // Remount per intervention so no view or countdown carries over.
+  return <InterruptModal key={active?.id ?? 'none'} active={active} onClose={clear} />;
 }

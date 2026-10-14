@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, space, radius, type } from '../theme/theme';
@@ -52,38 +52,30 @@ export function InterruptModal({
   const [view, setView] = useState<InterruptView>('prompt');
   const [breakKind, setBreakKind] = useState<BreakKind>('break');
   const [accepted, setAccepted] = useState(0);
-  const [memory, setMemory] = useState<string | null>(null);
-  const [remaining, setRemaining] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [memory] = useState<string | null>(() => {
+    try {
+      return active ? getYesterdayBreakMemory() : null;
+    } catch {
+      return null;
+    }
+  });
+  const [elapsed, setElapsed] = useState(0);
 
   const decision = active?.decision;
+  const maxDelay = Math.max(0, ...(decision?.options.map(o => o.delaySec) ?? []));
+  const secondsLeft = (opt: InterventionOption) => Math.max(0, opt.delaySec - elapsed);
 
-  // Keeps counting down while the "why" view is open.
+  // Keeps counting while the "why" view is open.
   useEffect(() => {
-    if (!active || !decision) return;
-    setView('prompt');
-    setBreakKind('break');
-    try {
-      setMemory(getYesterdayBreakMemory());
-    } catch {
-      setMemory(null);
-    }
-    const maxDelay = Math.max(0, ...decision.options.map(o => o.delaySec));
-    setRemaining(maxDelay);
-
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (maxDelay > 0) {
-      timerRef.current = setInterval(() => {
-        setRemaining(r => {
-          if (r <= 1 && timerRef.current) clearInterval(timerRef.current);
-          return Math.max(0, r - 1);
-        });
-      }, 1000);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [active, decision]);
+    if (maxDelay === 0) return;
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      const s = Math.floor((Date.now() - startedAt) / 1000);
+      setElapsed(s);
+      if (s >= maxDelay) clearInterval(timer);
+    }, 250);
+    return () => clearInterval(timer);
+  }, [maxDelay]);
 
   function takeBreak(kind: BreakKind, next: InterruptView) {
     if (!active) return;
@@ -94,7 +86,7 @@ export function InterruptModal({
   }
 
   function choose(opt: InterventionOption) {
-    if (opt.delaySec > 0 && remaining > 0) return;
+    if (secondsLeft(opt) > 0) return;
     if (!active) return;
     if (opt.response === 'accepted_break') {
       takeBreak('break', 'confirm');
@@ -154,7 +146,8 @@ export function InterruptModal({
 
             <View style={styles.actions}>
               {decision.options.map((opt, i) => {
-                const gated = opt.delaySec > 0 && remaining > 0;
+                const left = secondsLeft(opt);
+                const gated = left > 0;
                 const isPrimary = i === 0;
                 return (
                   <TouchableOpacity
@@ -164,17 +157,21 @@ export function InterruptModal({
                       isPrimary ? styles.btnPrimary : styles.btnGhost,
                       gated && styles.btnDisabled,
                     ]}
-                    activeOpacity={gated ? 1 : 0.8}
+                    disabled={gated}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: gated }}
+                    accessibilityHint={gated ? `Available in ${left} seconds` : undefined}
+                    activeOpacity={0.8}
                     onPress={() => choose(opt)}>
                     <Text style={isPrimary ? styles.btnPrimaryText : styles.btnGhostText}>
-                      {gated ? `${opt.label} (${remaining}s)` : opt.label}
+                      {gated ? `${opt.label} (${left}s)` : opt.label}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            {remaining > 0 && (
+            {elapsed < maxDelay && (
               <Text style={styles.frictionNote}>
                 Take a break anytime. Continuing waits a moment, and the wait
                 gets longer each time you push past your limit today.
