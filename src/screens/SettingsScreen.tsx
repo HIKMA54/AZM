@@ -77,6 +77,17 @@ export default function SettingsScreen() {
 
   const wrapHour = (h: number) => (h + 24) % 24;
 
+  // Testing aid: one background check in 60 s instead of waiting for the
+  // 15-minute cycle.
+  const [testPending, setTestPending] = useState(false);
+  async function runTest() {
+    setTestPending(true);
+    try {
+      await Monitor.testCheckIn(60);
+    } catch {}
+    setTimeout(() => setTestPending(false), 60000);
+  }
+
   async function toggleMonitoring(on: boolean) {
     setMonitoring(on);
     try {
@@ -129,6 +140,20 @@ export default function SettingsScreen() {
           </View>
         </TouchableOpacity>
       </Card>
+
+      {monitoring ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          disabled={testPending}
+          onPress={runTest}
+          style={styles.testBtn}>
+          <Text style={styles.testText}>
+            {testPending
+              ? 'Check runs in 1 minute. Switch to another app now.'
+              : 'Test background interrupt in 1 minute'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       <SectionLabel>Apps to watch</SectionLabel>
       <TouchableOpacity activeOpacity={0.7} onPress={() => setPickerOpen(true)}>
@@ -246,6 +271,8 @@ const styles = StyleSheet.create({
   linkText: { flex: 1, marginRight: space.md },
   chevron: { fontSize: 26, color: colors.inkFaint, marginTop: -2 },
   statusOn: { ...type.label, color: colors.accent },
+  testBtn: { marginTop: space.sm, paddingVertical: space.sm },
+  testText: { ...type.label, color: colors.accent, fontWeight: '600' },
   statusOff: { ...type.label, color: colors.accent, fontWeight: '600' },
   settingRow: {
     flexDirection: 'row',

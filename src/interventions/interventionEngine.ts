@@ -135,6 +135,7 @@ function levelForRisk(risk: DetectionResult['riskLevel']): InterventionLevel {
 export function decideIntervention(
   result: DetectionResult,
   now: number = Date.now(),
+  opts: { ignoreLimits?: boolean } = {},
 ): InterventionDecision {
   const none = (reason: string): InterventionDecision => ({
     shouldIntervene: false,
@@ -152,12 +153,15 @@ export function decideIntervention(
   if (result.firedRules.length === 0) return none('no rules fired');
   if (result.withinQuietHours) return none('within quiet hours');
 
-  const last = getLastInterventionTime();
-  const cooldownMs = cooldownMinutes() * 60 * 1000;
-  if (last != null && now - last < cooldownMs) return none('cooldown active');
+  // ignoreLimits is only set by the Settings test button.
+  if (!opts.ignoreLimits) {
+    const last = getLastInterventionTime();
+    const cooldownMs = cooldownMinutes() * 60 * 1000;
+    if (last != null && now - last < cooldownMs) return none('cooldown active');
 
-  if (countInterventionsSince(startOfLocalDay(now)) >= MAX_INTERVENTIONS_PER_DAY) {
-    return none('daily cap reached');
+    if (countInterventionsSince(startOfLocalDay(now)) >= MAX_INTERVENTIONS_PER_DAY) {
+      return none('daily cap reached');
+    }
   }
 
   const level = levelForRisk(result.riskLevel);

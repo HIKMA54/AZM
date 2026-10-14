@@ -6,9 +6,16 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
+import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 
 /**
@@ -19,7 +26,9 @@ object AzmNotifications {
     const val MONITOR_CHANNEL = "azm_monitor"
     const val INTERVENTION_CHANNEL = "azm_intervention"
     const val MONITOR_NOTIF_ID = 1001
-    private var interventionId = 2000
+    const val INTERVENTION_NOTIF_ID = 2000
+    const val LOG_TAG = "Azm"
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -74,7 +83,14 @@ object AzmNotifications {
             .setContentIntent(launchIntent(context, 1))
             .build()
         context.getSystemService(NotificationManager::class.java)
-            .notify(interventionId++, notif)
+            .notify(INTERVENTION_NOTIF_ID, notif)
+        Log.i(LOG_TAG, "intervention notification posted")
+    }
+
+    /** Removes the intervention notification once the interrupt is on screen. */
+    fun cancelIntervention(context: Context) {
+        context.getSystemService(NotificationManager::class.java)
+            .cancel(INTERVENTION_NOTIF_ID)
     }
 
     fun canDrawOverlays(context: Context): Boolean =
@@ -89,20 +105,63 @@ object AzmNotifications {
     }
 
     /**
-     * Brings Azm to the front so JS can show the pending intervention. Needs the
-     * overlay permission when launched from the background. Returns false if it
-     * couldn't, so the caller can post a notification instead.
+     * Brings Azm to the front so JS can show the pending intervention.
+     *
+     * Since Android 15, holding "Display over other apps" only lets an app start
+     * an activity from the background while one of its overlay windows is
+     * visible. So a 1x1 transparent, untouchable overlay is shown first, the
+     * activity is started, and the overlay is removed a moment later.
+     * Returns false when the permission is missing.
      */
     fun openInterrupt(context: Context): Boolean {
-        if (!canDrawOverlays(context)) return false
+        val allowed = canDrawOverlays(context)
+        Log.i(LOG_TAG, "openInterrupt: canDrawOverlays=$allowed")
+        if (!allowed) return false
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?: return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        val app = context.applicationContext
+        mainHandler.post {
+            val anchor = showAnchorOverlay(app)
+            try {
+                app.startActivity(intent)
+                Log.i(LOG_TAG, "openInterrupt: startActivity sent (anchor=${anchor != null})")
+            } catch (e: Exception) {
+                Log.w(LOG_TAG, "openInterrupt: startActivity failed", e)
+            }
+            if (anchor != null) {
+                mainHandler.postDelayed({ removeAnchorOverlay(app, anchor) }, 2000)
+            }
+        }
+        return true
+    }
+
+    private fun showAnchorOverlay(context: Context): View? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
         return try {
-            context.startActivity(intent)
-            true
+            val wm = context.getSystemService(WindowManager::class.java)
+            val view = View(context)
+            val params = WindowManager.LayoutParams(
+                1,
+                1,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                PixelFormat.TRANSLUCENT,
+            ).apply { gravity = Gravity.TOP or Gravity.START }
+            wm.addView(view, params)
+            view
         } catch (e: Exception) {
-            false
+            Log.w(LOG_TAG, "openInterrupt: overlay anchor failed", e)
+            null
+        }
+    }
+
+    private fun removeAnchorOverlay(context: Context, view: View) {
+        try {
+            context.getSystemService(WindowManager::class.java).removeView(view)
+        } catch (e: Exception) {
+            // Already gone.
         }
     }
 }

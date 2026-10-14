@@ -16,19 +16,35 @@ const { AzmMonitor } = NativeModules;
  * ingest, detect, decide, then hand any intervention to the native side.
  * Never throws, since that would kill the background process.
  */
-export default async function backgroundTask(): Promise<void> {
+export default async function backgroundTask(
+  data?: { test?: boolean },
+): Promise<void> {
+  const test = data?.test === true;
   try {
     initDatabase(); // separate JS context from the app
-    if (!(await UsageStatsService.hasUsageAccess())) return;
+    if (!(await UsageStatsService.hasUsageAccess())) {
+      AzmMonitor?.log?.('background check: skipped, no usage access');
+      return;
+    }
 
     const end = Date.now();
     const { touchedDates } = await ingestRecentEvents(end);
     if (touchedDates.length > 0) refreshRollups(touchedDates);
 
-    const decision = decideIntervention(runDetection(end), end);
+    const detection = runDetection(end);
+    // A test run from Settings skips the cooldown and daily cap.
+    const decision = decideIntervention(detection, end, { ignoreLimits: test });
+    // Visible in logcat under the "Azm" tag, release builds included.
+    AzmMonitor?.log?.(
+      `background check${test ? ' (test)' : ''}: risk=${detection.riskLevel}, fired=[${detection.firedRules
+        .map(r => r.type)
+        .join(',')}], decision=${decision.shouldIntervene ? 'intervene' : 'none'} (${decision.reason})`,
+    );
     if (decision.shouldIntervene) {
       presentIntervention(decision, end);
       AzmMonitor?.postIntervention(decision.title, decision.body);
     }
-  } catch {}
+  } catch (e: any) {
+    AzmMonitor?.log?.(`background check failed: ${e?.message ?? String(e)}`);
+  }
 }

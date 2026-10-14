@@ -7,6 +7,7 @@ import { seedDefaultSettings } from './src/database/settingsRepo';
 import { primeSystemExclusions } from './src/database/trackedAppsRepo';
 import AppNavigator from './src/navigation/AppNavigator';
 import { InterventionHost } from './src/interventions/InterventionHost';
+import { Monitor } from './src/background/monitor';
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -20,6 +21,8 @@ export default function App() {
         // Must run before the first detection pass reads the exclusions.
         await primeSystemExclusions();
         setDbReady(true);
+        // Restart monitoring if it's switched on but the service isn't running.
+        Monitor.ensureRunning();
       } catch (e: any) {
         setDbError(e?.message ?? String(e));
       }

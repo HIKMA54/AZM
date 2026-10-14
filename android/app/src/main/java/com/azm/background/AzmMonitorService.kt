@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 
 /**
  * Foreground service that starts AzmTaskService every 15 minutes. Detection
@@ -40,10 +41,12 @@ class AzmMonitorService : Service() {
     }
 
     private fun runCheck() {
+        Log.i(AzmNotifications.LOG_TAG, "monitor tick: starting background check")
         try {
             startService(Intent(this, AzmTaskService::class.java))
         } catch (e: Exception) {
             // Skip this tick; the next one will try again.
+            Log.w(AzmNotifications.LOG_TAG, "monitor tick: could not start check", e)
         }
     }
 

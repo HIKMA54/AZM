@@ -57,4 +57,28 @@ export const Monitor = {
   async openOverAppsSettings(): Promise<void> {
     await AzmMonitor.openOverlaySettings();
   },
+
+  /**
+   * Restarts the service when monitoring is switched on but not running,
+   * e.g. after a reinstall or the process being killed. Called on launch.
+   */
+  async ensureRunning(): Promise<void> {
+    if (!Monitor.isEnabled()) return;
+    if (await Monitor.isRunning()) return;
+    try {
+      await AzmMonitor.start();
+    } catch {}
+  },
+
+  /** Testing aid: run one background check after `seconds`. */
+  async testCheckIn(seconds: number): Promise<void> {
+    await AzmMonitor.runCheckIn(seconds);
+  },
+
+  /** Clears the intervention notification once the interrupt is on screen. */
+  clearInterventionNotification(): void {
+    try {
+      AzmMonitor?.clearInterventionNotification?.();
+    } catch {}
+  },
 };

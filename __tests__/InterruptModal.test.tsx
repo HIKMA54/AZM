@@ -1,3 +1,6 @@
+jest.mock('../src/background/monitor', () => ({
+  Monitor: { clearInterventionNotification: jest.fn() },
+}));
 jest.mock('../src/interventions/interventionsRepo', () => ({
   recordResponse: jest.fn(),
   getBreakAcceptanceStats: () => ({ accepted: 1, total: 1, rate: 1 }),

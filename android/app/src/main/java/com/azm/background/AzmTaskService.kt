@@ -10,7 +10,10 @@ class AzmTaskService : HeadlessJsTaskService() {
     override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig {
         return HeadlessJsTaskConfig(
             "AzmBackground",
-            Arguments.createMap(),
+            Arguments.createMap().apply {
+                // Set by MonitorModule.runCheckIn (the Settings test button).
+                putBoolean("test", intent?.getBooleanExtra("test", false) ?: false)
+            },
             30000,
             true, // allow in foreground
         )

@@ -11,6 +11,7 @@ import {
 } from '../interventions/interventionsRepo';
 import { WhyContent } from './WhyModal';
 import { BreathingExercise } from './BreathingExercise';
+import { Monitor } from '../background/monitor';
 
 const EYEBROW: Record<string, string> = {
   gentle: 'A GENTLE NUDGE',
@@ -64,6 +65,11 @@ export function InterruptModal({
   const decision = active?.decision;
   const maxDelay = Math.max(0, ...(decision?.options.map(o => o.delaySec) ?? []));
   const secondsLeft = (opt: InterventionOption) => Math.max(0, opt.delaySec - elapsed);
+
+  // On screen now, so the matching background notification is redundant.
+  useEffect(() => {
+    if (active) Monitor.clearInterventionNotification();
+  }, [active]);
 
   // Keeps counting while the "why" view is open.
   useEffect(() => {
