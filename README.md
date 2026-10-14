@@ -21,7 +21,7 @@ Android only: iOS gives third-party apps no equivalent of `UsageStatsManager`.
   - a line from yesterday's record ("Yesterday you took a break after 35 minutes");
   - alternatives to scrolling: a one-minute guided breathing exercise, or "Step away";
   - "Why am I seeing this?", which lists the rule and the numbers behind it.
-- **Interrupt over other apps:** with the "Display over other apps" permission, the background check brings Azm in front of the app you're using. Without it, Azm sends a notification.
+- **Interrupt over other apps:** with the "Display over other apps" permission, the background check brings Azm in front of the app you're using. A notification is always posted as well, as a fallback, and is removed once the interrupt is on screen.
 - **Limits on Azm itself:** quiet hours, a daily cap of 8 interventions, and a cooldown that depends on your last answer (45 minutes after a break, 15 after "keep scrolling", 30 otherwise).
 - **Today, Insights and Settings screens**, showing plain-language facts rather than a score.
 
@@ -38,9 +38,9 @@ UsageStatsManager (Android)
   → InterruptModal.tsx         full-screen interrupt in the app
 ```
 
-**When Azm is closed,** a foreground service (`AzmMonitorService.kt`) wakes every 15 minutes and runs the same TypeScript engine as a headless task (`backgroundTask.ts`). If it decides to intervene, it does one of two things:
-- **With the permission granted:** it brings Azm to the front, and the interrupt for that intervention appears.
-- **Without it:** it posts a notification. Opening Azm within 15 minutes shows the same interrupt.
+**When Azm is closed,** a foreground service (`AzmMonitorService.kt`) wakes every 15 minutes and runs the same TypeScript engine as a headless task (`backgroundTask.ts`). Opening Azm restarts the service if Android has stopped it. If the engine decides to intervene:
+- **With the permission granted:** Azm is brought to the front and the interrupt appears over the current app. Since Android 15, an app holding "Display over other apps" may only start an activity from the background while one of its overlay windows is visible, so Azm briefly shows a 1×1 transparent, untouchable overlay before launching (`AzmNotifications.openInterrupt`).
+- **In every case:** a notification is posted. Tapping it, or opening Azm within 15 minutes, shows the same interrupt.
 
 **Risk level** comes from which rules fired:
 
@@ -69,6 +69,19 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
 Release signing reads `android/keystore.properties`, which is not in git. Without it, use the debug build.
+
+### Testing the background interrupt
+
+1. In Settings, turn on background monitoring and *Interrupt over other apps*.
+2. Make sure a rule will fire, e.g. set the daily goal (minimum 30 minutes) below today's time on watched apps.
+3. Tap **Test background interrupt in 1 minute**, then switch to a watched app.
+4. Follow the checks in logcat:
+
+```sh
+adb logcat -s Azm ReactNativeJS
+```
+
+Each check logs the risk level, the rules that fired and the decision with its reason (for example `decision=none (cooldown active)`). The test run skips the cooldown and daily cap; scheduled checks do not.
 
 ### Permissions on the phone
 
@@ -123,6 +136,7 @@ The unit tests cover the date helpers, app-name lookup, the intervention log que
 - **What it detects:** Azm sees which app is open and for how long, not what is on screen. It detects long social media sessions rather than doom-scrolling specifically.
 - **Timing:** background checks run every 15 minutes, so an interrupt can arrive up to 15 minutes after a rule fires.
 - **Testing so far:** Azm has been tested on an emulator and one Samsung phone. Behaviour on other manufacturers' battery management is untested.
+- **Background launch:** opening the interrupt over another app depends on Android's background-activity rules, which have tightened in recent versions. If a future version blocks the launch, the notification is still posted.
 - **Effect on behaviour:** whether Azm changes behaviour has not been measured; a before-and-after study is designed but not yet run.
 
 ## License
