@@ -7,6 +7,7 @@ import { runDetection } from '../detection/engine';
 import {
   decideIntervention,
   presentIntervention,
+  resumePendingIntervention,
   InterventionDecision,
 } from './interventionEngine';
 
@@ -17,9 +18,9 @@ export interface ActiveIntervention {
 
 /**
  * Watches for interventions from inside the app: it re-checks on launch and
- * every time the app returns to the foreground. That foreground check is a
- * stand-in for the background service (next step) — once that exists, the same
- * decision path runs continuously instead of only when the app is opened.
+ * every time the app returns to the foreground. While the app is closed the
+ * background task makes the same decision and posts a notification; when the
+ * user then opens Azm, that unanswered intervention is shown here full-screen.
  *
  * Guards: it won't run while a check is in flight or while an intervention is
  * already on screen, and decideIntervention's own cooldown/quiet-hours/cap
@@ -37,7 +38,15 @@ export function useInterventionWatcher() {
       const end = Date.now();
       const { touchedDates } = await ingestRecentEvents(end);
       if (touchedDates.length > 0) refreshRollups(touchedDates);
-      const decision = decideIntervention(runDetection(end), end);
+      const detection = runDetection(end);
+      // An unanswered intervention (e.g. the notification the user just
+      // tapped) comes first; otherwise its own cooldown would hide it.
+      const pending = resumePendingIntervention(detection, end);
+      if (pending) {
+        setActive(pending);
+        return;
+      }
+      const decision = decideIntervention(detection, end);
       if (decision.shouldIntervene) {
         setActive({ decision, id: presentIntervention(decision, end) });
       }

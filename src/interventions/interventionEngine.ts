@@ -10,12 +10,15 @@ import {
   FRICTION_BASE_SEC,
   FRICTION_STEP_SEC,
   FRICTION_MAX_SEC,
+  PENDING_INTERVENTION_WINDOW_MIN,
 } from './interventionConfig';
 import {
   getLastInterventionTime,
   getLastResponse,
   countInterventionsSince,
   countInterventionsToday,
+  countInterventionsBetween,
+  getPendingIntervention,
   logIntervention,
 } from './interventionsRepo';
 import { startOfLocalDay } from '../utils/datetime';
@@ -75,8 +78,10 @@ function cooldownMinutes(): number {
  * shown today, capped so it never becomes a de-facto lockout. Leaving is always
  * instant; only continuing costs time, and it costs more the more it recurs.
  */
-function frictionSeconds(now: number): number {
-  const priorToday = countInterventionsToday(now);
+function frictionSeconds(
+  now: number,
+  priorToday: number = countInterventionsToday(now),
+): number {
   return Math.min(
     FRICTION_MAX_SEC,
     FRICTION_BASE_SEC + priorToday * FRICTION_STEP_SEC,
@@ -199,4 +204,56 @@ export function presentIntervention(
     decision.trigger.detail,
     now,
   );
+}
+
+/**
+ * Re-opens an intervention that was logged but never answered, most often one
+ * the background task posted as a notification. Without this, tapping that
+ * notification would open Azm into the cooldown the notification itself
+ * started, and the full-screen interrupt would never appear.
+ *
+ * The level comes from the current detection (the notification didn't store
+ * one), and the friction is what it would have been when the intervention was
+ * first shown, so reopening it neither raises nor lowers the cost of
+ * continuing. Returns null when nothing is pending.
+ */
+export function resumePendingIntervention(
+  result: DetectionResult,
+  now: number = Date.now(),
+): { decision: InterventionDecision; id: number } | null {
+  const pending = getPendingIntervention(
+    now - PENDING_INTERVENTION_WINDOW_MIN * 60 * 1000,
+  );
+  if (!pending) return null;
+
+  const trigger: RuleResult = {
+    type: pending.trigger,
+    fired: true,
+    packageName: pending.packageName,
+    status: 'active',
+    detail: pending.detail,
+  };
+  const level: InterventionLevel =
+    levelForRisk(result.riskLevel) === 'interrupt' ? 'interrupt' : 'gentle';
+  const frictionSec = frictionSeconds(
+    now,
+    countInterventionsBetween(startOfLocalDay(pending.shownAt), pending.shownAt),
+  );
+  const { title, body } = copyFor(trigger);
+
+  return {
+    id: pending.id,
+    decision: {
+      shouldIntervene: true,
+      reason: `resumed pending ${trigger.type}, friction ${frictionSec}s`,
+      level,
+      trigger,
+      firedRules: [trigger],
+      packageName: trigger.packageName,
+      title,
+      body,
+      options: optionsFor(level, frictionSec),
+      frictionSec,
+    },
+  };
 }

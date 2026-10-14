@@ -36,3 +36,10 @@ export const COOLDOWN_DEFAULT_MIN = 30;
 export const FRICTION_BASE_SEC = 5;
 export const FRICTION_STEP_SEC = 10;
 export const FRICTION_MAX_SEC = 60;
+
+/**
+ * An intervention left unanswered (a background notification, or an in-app
+ * interrupt closed without a choice) is shown again full-screen if Azm is
+ * opened within this many minutes of it.
+ */
+export const PENDING_INTERVENTION_WINDOW_MIN = 15;

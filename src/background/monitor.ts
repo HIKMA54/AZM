@@ -46,4 +46,22 @@ export const Monitor = {
     await AzmMonitor.stop();
     setEnabledFlag(false);
   },
+
+  /**
+   * Whether "Display over other apps" is granted. With it, a background check
+   * brings Azm to the front with the full-screen interrupt; without it, the
+   * user gets a notification instead.
+   */
+  async canShowOverApps(): Promise<boolean> {
+    try {
+      return await AzmMonitor.canDrawOverlays();
+    } catch {
+      return false;
+    }
+  },
+
+  /** Opens the system screen where the user grants that permission. */
+  async openOverAppsSettings(): Promise<void> {
+    await AzmMonitor.openOverlaySettings();
+  },
 };

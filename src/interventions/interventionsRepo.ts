@@ -66,6 +66,59 @@ export function countInterventionsToday(now: number = Date.now()): number {
   return countInterventionsSince(startOfLocalDay(now));
 }
 
+/** Interventions shown in [fromMs, toMs). */
+export function countInterventionsBetween(fromMs: number, toMs: number): number {
+  return (
+    query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM interventions WHERE shown_at >= ? AND shown_at < ?',
+      [fromMs, toMs],
+    )[0]?.n ?? 0
+  );
+}
+
+export interface PendingIntervention {
+  id: number;
+  packageName: string | null;
+  trigger: InterventionTrigger;
+  detail: Record<string, number>;
+  shownAt: number;
+}
+
+/**
+ * The most recent intervention since `sinceMs` that nobody has answered yet,
+ * typically one posted as a notification while Azm was in the background.
+ */
+export function getPendingIntervention(sinceMs: number): PendingIntervention | null {
+  const row = query<{
+    id: number;
+    package_name: string;
+    trigger_type: InterventionTrigger;
+    trigger_detail: string | null;
+    shown_at: number;
+  }>(
+    `SELECT id, package_name, trigger_type, trigger_detail, shown_at FROM interventions
+     WHERE response = 'no_response' AND shown_at >= ?
+     ORDER BY shown_at DESC LIMIT 1`,
+    [sinceMs],
+  )[0];
+  if (!row) return null;
+
+  let detail: Record<string, number> = {};
+  try {
+    detail = row.trigger_detail ? JSON.parse(row.trigger_detail) : {};
+  } catch {
+    // Keep an empty detail; the copy falls back to generic wording.
+  }
+  return {
+    id: row.id,
+    // logIntervention stores '*' for aggregate rules with no single app.
+    packageName: row.package_name === '*' ? null : row.package_name,
+    trigger: row.trigger_type,
+    detail,
+    shownAt: row.shown_at,
+  };
+}
+
 /**
  * Break-acceptance metric. Denominator counts only clear decisions
  * (accepted_break vs kept_scrolling); dismissed/snoozed/unanswered are excluded,

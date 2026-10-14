@@ -5,7 +5,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-/** JS bridge for starting/stopping monitoring and posting nudge notifications. */
+/** JS bridge for starting/stopping monitoring and delivering interventions. */
 class MonitorModule(private val ctx: ReactApplicationContext) :
     ReactContextBaseJavaModule(ctx) {
 
@@ -36,9 +36,30 @@ class MonitorModule(private val ctx: ReactApplicationContext) :
         promise.resolve(AzmMonitorService.running)
     }
 
-    /** Posts an intervention notification (called from the headless task). */
+    /**
+     * Delivers an intervention from the headless task. With "Display over other
+     * apps" granted, Azm comes to the front and shows the full-screen interrupt;
+     * otherwise it falls back to a notification.
+     */
     @ReactMethod
     fun postIntervention(title: String, body: String) {
-        AzmNotifications.postIntervention(ctx, title, body)
+        if (!AzmNotifications.openInterrupt(ctx)) {
+            AzmNotifications.postIntervention(ctx, title, body)
+        }
+    }
+
+    @ReactMethod
+    fun canDrawOverlays(promise: Promise) {
+        promise.resolve(AzmNotifications.canDrawOverlays(ctx))
+    }
+
+    @ReactMethod
+    fun openOverlaySettings(promise: Promise) {
+        try {
+            AzmNotifications.openOverlaySettings(ctx)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("OVERLAY_SETTINGS_FAILED", e)
+        }
     }
 }

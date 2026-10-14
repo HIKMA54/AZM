@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, AppState } from 'react-native';
 import { Screen, Card, SectionLabel, Divider } from '../components/ui';
 import { colors, space, radius, type } from '../theme/theme';
 import {
@@ -65,6 +65,18 @@ export default function SettingsScreen() {
     Monitor.isRunning().then(r => setMonitoring(r || Monitor.isEnabled()));
   }, []);
 
+  // "Display over other apps" is granted outside Azm, so re-check it whenever
+  // the user comes back from the system settings screen.
+  const [overApps, setOverApps] = useState(false);
+  useEffect(() => {
+    const refresh = () => Monitor.canShowOverApps().then(setOverApps);
+    refresh();
+    const sub = AppState.addEventListener('change', st => {
+      if (st === 'active') refresh();
+    });
+    return () => sub.remove();
+  }, []);
+
   const wrapHour = (h: number) => (h + 24) % 24;
 
   async function toggleMonitoring(on: boolean) {
@@ -99,6 +111,25 @@ export default function SettingsScreen() {
             thumbColor={colors.white}
           />
         </View>
+        <Divider />
+        <TouchableOpacity
+          activeOpacity={0.7}
+          disabled={overApps}
+          onPress={() => Monitor.openOverAppsSettings().catch(() => {})}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingText}>
+              <Text style={[type.heading, { color: colors.ink }]}>Interrupt over other apps</Text>
+              <Text style={[type.caption, styles.caption]}>
+                {overApps
+                  ? 'On. When a rule fires while you scroll, Azm opens full-screen on top.'
+                  : 'Off. You get a notification instead. Tap to allow "Display over other apps".'}
+              </Text>
+            </View>
+            <Text style={overApps ? styles.statusOn : styles.statusOff}>
+              {overApps ? 'Allowed' : 'Allow ›'}
+            </Text>
+          </View>
+        </TouchableOpacity>
       </Card>
 
       <SectionLabel>Apps to watch</SectionLabel>
@@ -216,6 +247,8 @@ const styles = StyleSheet.create({
   linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   linkText: { flex: 1, marginRight: space.md },
   chevron: { fontSize: 26, color: colors.inkFaint, marginTop: -2 },
+  statusOn: { ...type.label, color: colors.accent },
+  statusOff: { ...type.label, color: colors.accent, fontWeight: '600' },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',

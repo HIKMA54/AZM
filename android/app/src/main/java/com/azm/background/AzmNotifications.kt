@@ -5,7 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 
 /**
@@ -79,5 +82,38 @@ object AzmNotifications {
             .build()
         context.getSystemService(NotificationManager::class.java)
             .notify(interventionId++, notif)
+    }
+
+    /** True when the user has allowed Azm to "Display over other apps". */
+    fun canDrawOverlays(context: Context): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
+
+    /** Opens the system screen where the user grants "Display over other apps". */
+    fun openOverlaySettings(context: Context) {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:" + context.packageName),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+
+    /**
+     * Brings Azm to the front over whatever app is open, so the JS side can show
+     * the pending intervention full-screen. Android only allows this from the
+     * background when "Display over other apps" is granted. MainActivity is
+     * singleTask, so an existing Azm task is reused rather than duplicated.
+     * Returns false if it could not, so the caller can fall back to a notification.
+     */
+    fun openInterrupt(context: Context): Boolean {
+        if (!canDrawOverlays(context)) return false
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?: return false
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        return try {
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 }

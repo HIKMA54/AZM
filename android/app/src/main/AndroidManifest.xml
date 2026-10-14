@@ -7,6 +7,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!--
+      "Display over other apps". Lets the background check bring Azm to the
+      front so the full-screen interrupt appears over the app being scrolled,
+      instead of only a notification. Granted by the user in system settings;
+      without it Azm falls back to the notification.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!--
       Lets getLaunchableApps() (UsageStatsModule.kt) see other launcher apps under

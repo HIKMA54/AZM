@@ -2,7 +2,7 @@
  * Azm design tokens.
  *
  * Design thesis: Azm exists to reduce compulsive app use, so it must not behave
- * like the apps it fights. The palette is calm and grounded (cool paper + slate,
+ * like the apps it fights. The palette is calm and grounded (cool paper + slate with a deep green accent,
  * NOT the warm cream/terracotta that reads as generic), boldness is spent in one
  * place — a plain-language daily "read" — and every number is shown as quiet
  * monospace evidence rather than a glowing score. Behavioral language leads;
@@ -20,8 +20,8 @@ export const colors = {
 
   line: '#E2E5E7', // hairline borders
 
-  accent: '#356B7D', // steady teal — "focus"
-  accentSoft: '#E4EDF0',
+  accent: '#2E6B5C', // deep green, from the hi-fi Figma (buttons, active tab, labels)
+  accentSoft: '#E3F0E9', // pale green tint behind highlighted cards
 
   white: '#FFFFFF',
 };
