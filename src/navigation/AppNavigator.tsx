@@ -13,12 +13,6 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'settings', label: 'Settings' },
 ];
 
-/**
- * Lightweight state-based tab shell. Intentionally not react-navigation yet —
- * three sibling tabs are just state, and this avoids another native dependency
- * on a fragile build. react-navigation's stack/modal comes in when we add
- * pushed detail screens and the full-screen interrupt, where it earns its place.
- */
 export default function AppNavigator() {
   const [tab, setTab] = useState<TabKey>('today');
   const insets = useSafeAreaInsets();

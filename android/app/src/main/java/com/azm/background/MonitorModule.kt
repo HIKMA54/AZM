@@ -5,7 +5,6 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-/** JS bridge for starting/stopping monitoring and delivering interventions. */
 class MonitorModule(private val ctx: ReactApplicationContext) :
     ReactContextBaseJavaModule(ctx) {
 
@@ -36,11 +35,7 @@ class MonitorModule(private val ctx: ReactApplicationContext) :
         promise.resolve(AzmMonitorService.running)
     }
 
-    /**
-     * Delivers an intervention from the headless task. With "Display over other
-     * apps" granted, Azm comes to the front and shows the full-screen interrupt;
-     * otherwise it falls back to a notification.
-     */
+    // Opens the full-screen interrupt if allowed, otherwise posts a notification.
     @ReactMethod
     fun postIntervention(title: String, body: String) {
         if (!AzmNotifications.openInterrupt(ctx)) {

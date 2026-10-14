@@ -1,32 +1,20 @@
-/**
- * Azm design tokens.
- *
- * Design thesis: Azm exists to reduce compulsive app use, so it must not behave
- * like the apps it fights. The palette is calm and grounded (cool paper + slate with a deep green accent,
- * NOT the warm cream/terracotta that reads as generic), boldness is spent in one
- * place — a plain-language daily "read" — and every number is shown as quiet
- * monospace evidence rather than a glowing score. Behavioral language leads;
- * raw time is secondary.
- */
-
 export const colors = {
-  bg: '#F3F4F5', // cool soft paper
+  bg: '#F3F4F5',
   surface: '#FFFFFF',
   surfaceSunken: '#ECEEEF',
 
-  ink: '#20272E', // primary text — deep slate
-  inkSoft: '#5A646C', // secondary
-  inkFaint: '#8A939B', // captions / muted
+  ink: '#20272E',
+  inkSoft: '#5A646C',
+  inkFaint: '#8A939B',
 
-  line: '#E2E5E7', // hairline borders
+  line: '#E2E5E7',
 
-  accent: '#2E6B5C', // deep green, from the hi-fi Figma (buttons, active tab, labels)
-  accentSoft: '#E3F0E9', // pale green tint behind highlighted cards
+  accent: '#2E6B5C',
+  accentSoft: '#E3F0E9',
 
   white: '#FFFFFF',
 };
 
-/** Muted, deliberately non-alarming risk tones. */
 export const risk = {
   low: { fg: '#3F7A5E', bg: '#E6F0EA', label: 'steady' },
   medium: { fg: '#9A7326', bg: '#F3EBD9', label: 'a little high' },
@@ -52,10 +40,6 @@ export const radius = {
   pill: 999,
 };
 
-/**
- * Type roles. System sans for the interface voice; a monospace utility for data,
- * so numbers read as measured evidence — the visual echo of "facts, not scores".
- */
 export const type = {
   display: { fontSize: 27, lineHeight: 34, fontWeight: '600' as const, color: colors.ink },
   title: { fontSize: 20, lineHeight: 26, fontWeight: '600' as const, color: colors.ink },

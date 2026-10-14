@@ -1,8 +1,4 @@
-/**
- * Locks the date windows and messages produced by interventionsRepo, using an
- * in-memory stand-in for the SQLite layer. Run under more than one TZ (see
- * the npm "test" notes in the README) so daylight-saving days are covered.
- */
+// Run under more than one TZ so the daylight-saving days below are exercised.
 jest.mock('../src/database/db', () => {
   const state: { rows: any[]; calls: { sql: string; params: any[] }[] } = {
     rows: [],

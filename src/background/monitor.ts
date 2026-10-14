@@ -3,7 +3,6 @@ import { query, run } from '../database/db';
 
 const { AzmMonitor } = NativeModules;
 
-/** Persisted "the user wants monitoring on" flag, stored in the settings table. */
 function setEnabledFlag(on: boolean): void {
   run(
     `INSERT INTO settings (key, value) VALUES ('monitoring_enabled', ?)
@@ -13,7 +12,7 @@ function setEnabledFlag(on: boolean): void {
 }
 
 export const Monitor = {
-  /** Desired state, remembered across restarts so the toggle reflects reality. */
+  /** What the user asked for, which may differ from isRunning(). */
   isEnabled(): boolean {
     return (
       query<{ value: string }>(
@@ -22,7 +21,6 @@ export const Monitor = {
     );
   },
 
-  /** Whether the foreground service is actually running right now. */
   async isRunning(): Promise<boolean> {
     try {
       return await AzmMonitor.isRunning();
@@ -47,11 +45,7 @@ export const Monitor = {
     setEnabledFlag(false);
   },
 
-  /**
-   * Whether "Display over other apps" is granted. With it, a background check
-   * brings Azm to the front with the full-screen interrupt; without it, the
-   * user gets a notification instead.
-   */
+  /** "Display over other apps". Without it, background nudges are notifications. */
   async canShowOverApps(): Promise<boolean> {
     try {
       return await AzmMonitor.canDrawOverlays();
@@ -60,7 +54,6 @@ export const Monitor = {
     }
   },
 
-  /** Opens the system screen where the user grants that permission. */
   async openOverAppsSettings(): Promise<void> {
     await AzmMonitor.openOverlaySettings();
   },

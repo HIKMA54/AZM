@@ -9,26 +9,19 @@ function dateNDaysAgo(now: number, n: number): string {
 }
 
 /**
- * Recomputes each app's baseline from daily_rollups over a trailing window,
- * EXCLUDING today. Today is excluded on purpose: it is a partial, in-progress
- * day, so folding it into the "usual" would bias every comparison the rules
- * make against it.
+ * Recomputes baselines from daily_rollups over the trailing window. Today is
+ * left out because it's a partial day.
  *
- * Each baseline value is a plain arithmetic mean over completed days:
- *   avg_opens_day  = mean daily open count
- *   avg_session_ms = total time / total opens  (time-weighted mean session length)
+ *   avg_opens_day  = mean daily opens
+ *   avg_session_ms = total time / total opens
  *   avg_daily_ms   = mean daily total time
- *   sample_days    = number of days actually contributing
- * All four are documented statistics, not a fitted or weighted score — which is
- * what makes "6 opens vs your usual 2" defensible in a viva.
+ *   sample_days    = days contributing
  */
 export function refreshBaselines(now: number = Date.now()): void {
   const windowStart = dateNDaysAgo(now, BASELINE_WINDOW_DAYS);
   const todayStr = toLocalDate(now);
 
-  // Same reasoning as refreshRollups(): drop any baseline row already stored
-  // for an excluded package, since the rebuild below won't touch a row it no
-  // longer produces.
+  // The upsert below never touches excluded packages, so clear them first.
   const excluded = [...getSystemExclusions()];
   if (excluded.length > 0) {
     run(
@@ -90,11 +83,7 @@ export function getBaseline(packageName: string): AppBaselineRow | null {
   return rows[0] ?? null;
 }
 
-/**
- * Learning phase state. Azm needs several days of history before "vs your
- * usual" means anything, so baseline-dependent rules stay dormant until then.
- * Day count = distinct calendar days that have any session data.
- */
+/** Days counted are distinct dates with any session data. */
 export function getLearningPhase(): { active: boolean; day: number; of: number } {
   const days =
     query<{ n: number }>(

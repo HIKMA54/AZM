@@ -9,17 +9,12 @@ import android.os.IBinder
 import android.os.Looper
 
 /**
- * Foreground service that keeps Azm's monitoring alive and, on an interval,
- * kicks the headless JS task to run detection. A foreground service is what
- * makes continuous background monitoring survive Doze and process pressure; the
- * ongoing (silent) notification is the OS requirement for that privilege.
- *
- * The heavy thinking happens in JS (via AzmTaskService); this class only keeps
- * time and stays alive.
+ * Foreground service that starts AzmTaskService every 15 minutes. Detection
+ * itself runs in JS; this only keeps the process alive through Doze.
  */
 class AzmMonitorService : Service() {
     private val handler = Handler(Looper.getMainLooper())
-    private val intervalMs = 15 * 60 * 1000L // 15 minutes
+    private val intervalMs = 15 * 60 * 1000L
 
     private val tick = object : Runnable {
         override fun run() {
@@ -40,15 +35,15 @@ class AzmMonitorService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         handler.removeCallbacks(tick)
-        handler.post(tick) // run one check now, then every interval
-        return START_STICKY // ask the OS to restart us if killed
+        handler.post(tick)
+        return START_STICKY
     }
 
     private fun runCheck() {
         try {
             startService(Intent(this, AzmTaskService::class.java))
         } catch (e: Exception) {
-            // A tick that can't start (rare OS restriction) is simply skipped.
+            // Skip this tick; the next one will try again.
         }
     }
 

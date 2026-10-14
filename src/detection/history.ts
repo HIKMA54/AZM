@@ -26,10 +26,8 @@ function weekdayShort(ts: number): string {
 }
 
 /**
- * Computes the risk level for a single past day by replaying the same rules the
- * live engine uses, against that day's stored sessions. Baselines are the
- * current ones, so this reads as "how that day compared to your recent usual" —
- * a documented approximation that keeps the whole trend on one consistent ruler.
+ * Replays the live rules against a past day's sessions. Uses today's
+ * baselines, not the ones that applied on that day.
  */
 export function riskForDate(
   date: string,
@@ -105,7 +103,7 @@ export interface DaySeries {
   isToday: boolean;
 }
 
-/** The last 7 days, oldest first, with per-day risk and behavioral totals. */
+/** Last 7 days, oldest first. */
 export function getWeeklySeries(now: number = Date.now()): DaySeries[] {
   const lateHour =
     getSettingNumber('late_night_start_hour') ?? DEFAULT_LATE_NIGHT_HOUR;

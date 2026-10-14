@@ -4,36 +4,18 @@ import { getSystemExclusions } from '../database/trackedAppsRepo';
 import { DEFAULT_LATE_NIGHT_HOUR } from './detectionConfig';
 
 /**
- * Rebuilds the daily_rollups table from raw sessions in a single pass.
+ * Rebuilds daily_rollups from sessions. A session counts entirely as
+ * late-night if it starts at or after the late-night hour.
  *
- * Rollups are per-app-per-day aggregates (opens, total time, late-night time,
- * first/last open) so the Insights charts and baseline computation never have
- * to rescan every session. Data volume is small (one person's usage), so a full
- * rebuild each run is simpler and less error-prone than incremental updates and
- * still cheap. late_night_ms attributes a session's whole duration by its start
- * hour — a documented simplification: a session that begins at/after the
- * late-night hour counts as late-night use.
- *
- * The home launcher / System UI / Azm are excluded here even though
- * saveSessions() already keeps them out of `sessions` going forward — this is
- * what actually cleans rollups built before that fix existed, without
- * deleting the raw session rows themselves.
- *
- * @param dates  When given, only these local_dates are rebuilt — used after a
- *   checkpointed ingest, which knows exactly which days its batch touched, so
- *   a routine catch-up doesn't rescan the entire sessions history every time.
- *   Omitted entirely (not just empty), the full table is rebuilt.
+ * @param dates  Only rebuild these local dates. Omit to rebuild everything.
  */
 export function refreshRollups(dates?: string[]): void {
   const lateHour =
     getSettingNumber('late_night_start_hour') ?? DEFAULT_LATE_NIGHT_HOUR;
   const excluded = [...getSystemExclusions()];
 
-  // Deletes any rows already rolled up for an excluded package before this
-  // fix existed — the INSERT...SELECT below only updates rows it still
-  // produces, so a stale row for e.g. the launcher would otherwise never go
-  // away on its own. Unscoped by date: it's a one-time historical cleanup,
-  // cheap, and a no-op once already clean.
+  // Older builds rolled up the launcher; the upsert below would never remove
+  // those rows on its own.
   if (excluded.length > 0) {
     run(
       `DELETE FROM daily_rollups WHERE package_name IN (${excluded.map(() => '?').join(',')})`,

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, space, radius, type } from '../theme/theme';
 
-/** Paced breathing: 4 s in, 6 s out. A longer exhale is the usual calming ratio. */
+// 4s in, 6s out.
 const INHALE_MS = 4000;
 const EXHALE_MS = 6000;
 const CYCLE_MS = INHALE_MS + EXHALE_MS;
@@ -10,12 +10,6 @@ const CYCLE_MS = INHALE_MS + EXHALE_MS;
 const MIN_SCALE = 0.55;
 const MAX_SCALE = 1;
 
-/**
- * A one-minute guided breathing pause, offered on the interrupt as something to
- * do instead of scrolling. A circle grows on the in-breath and shrinks on the
- * out-breath, with the phase written underneath so it works without sound.
- * Finishing early is always allowed; nothing here is gated.
- */
 export function BreathingExercise({
   durationSec = 60,
   onDone,

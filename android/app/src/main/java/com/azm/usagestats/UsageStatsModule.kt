@@ -17,14 +17,8 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableArray
 
 /**
- * Azm's bridge to Android's UsageStatsManager.
- *
- * The module deliberately stays thin: it only fetches raw foreground/background
- * events and reports whether the special access permission is granted. All
- * behavioural logic (sessionizing, impulse-open counting, baselines, late-night
- * detection) lives in JavaScript so that every metric Azm shows can be traced
- * back to raw OS events rather than an opaque native computation. That
- * separation is the defensible story: the OS supplies facts, Azm supplies rules.
+ * Bridge to UsageStatsManager and PackageManager. Only returns raw events and
+ * app info; sessionizing and detection happen in JS.
  */
 class UsageStatsModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -35,13 +29,7 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
         private const val SYSTEMUI_PACKAGE = "com.android.systemui"
     }
 
-    /**
-     * Resolves the device's current default home app via PackageManager, the
-     * same mechanism Android itself uses to decide what the home button opens.
-     * Done at runtime (never hardcoded) so it works across manufacturers/launchers.
-     * Requires the CATEGORY_HOME <queries> entry on API 30+; returns null rather
-     * than throwing if it can't be resolved.
-     */
+    // Default launcher package. Needs the CATEGORY_HOME <queries> entry on API 30+.
     private fun resolveHomePackage(): String? {
         return try {
             val pm = reactContext.packageManager
@@ -53,11 +41,7 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    /**
-     * Packages that must never be tracked or counted as usage, regardless of
-     * what the user has picked: the device's home launcher (every return to
-     * home reads as an "open" otherwise), System UI, and Azm itself.
-     */
+    // Launcher, System UI and Azm. Without this every return to home counts as an open.
     @ReactMethod
     fun getSystemExcludedPackages(promise: Promise) {
         try {
@@ -71,13 +55,7 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    /**
-     * On-demand display-name resolution for a single package, used only as a
-     * fallback when no cached name exists (see trackedAppsRepo's name map).
-     * Resolves the true app-level label, not an activity label, so it matches
-     * what the Tracked Apps picker shows. Null if the package is uninstalled
-     * or otherwise can't be resolved.
-     */
+    // Application label (not activity label) so it matches the picker. Null if uninstalled.
     @ReactMethod
     fun getAppLabel(packageName: String, promise: Promise) {
         try {
@@ -91,11 +69,7 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    /**
-     * PACKAGE_USAGE_STATS is a "special" permission: it cannot be requested with
-     * a runtime dialog. We check it via AppOpsManager and, if missing, deep-link
-     * the user to the Usage Access settings screen (see openUsageAccessSettings).
-     */
+    // PACKAGE_USAGE_STATS can't be requested at runtime, so check it via AppOps.
     @ReactMethod
     fun hasUsageAccess(promise: Promise) {
         try {
@@ -128,12 +102,7 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
         reactContext.startActivity(intent)
     }
 
-    /**
-     * Returns the raw foreground (1) and background (2) events between two
-     * epoch-millisecond timestamps. Only these two event types are passed
-     * through; everything else in the UsageEvents stream is noise for our
-     * purposes. Timestamps stay well within JS safe-integer range.
-     */
+    // Foreground/background events only, between two epoch-ms timestamps.
     @ReactMethod
     fun queryEvents(beginTime: Double, endTime: Double, promise: Promise) {
         try {
@@ -145,7 +114,6 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
                 val type = event.eventType
-                // MOVE_TO_FOREGROUND == 1, MOVE_TO_BACKGROUND == 2 across API levels.
                 if (type == UsageEvents.Event.MOVE_TO_FOREGROUND ||
                     type == UsageEvents.Event.MOVE_TO_BACKGROUND
                 ) {
@@ -162,16 +130,8 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    /**
-     * Lists launchable (user-facing) apps for the "Tracked apps" picker.
-     * Querying LAUNCHER activities avoids the QUERY_ALL_PACKAGES permission,
-     * which keeps Azm's privacy posture clean: it only ever sees apps that
-     * appear in the launcher, never a full package inventory.
-     *
-     * The device's home app, System UI, and Azm itself are excluded here too
-     * (not just in JS): returning to the home screen isn't "using an app", so
-     * it must never even be offered as something to track.
-     */
+    // Launchable apps for the picker, minus the excluded packages. Querying
+    // LAUNCHER activities avoids needing QUERY_ALL_PACKAGES.
     @ReactMethod
     fun getLaunchableApps(promise: Promise) {
         try {
@@ -192,8 +152,6 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
                 if (!seen.add(pkg)) continue
                 val map = Arguments.createMap()
                 map.putString("packageName", pkg)
-                // App-level label (matches getAppLabel/getApplicationLabel), not the
-                // activity's own label, so the picker and every other screen agree.
                 val label = try {
                     pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
                 } catch (e: PackageManager.NameNotFoundException) {

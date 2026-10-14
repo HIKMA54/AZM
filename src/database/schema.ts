@@ -1,30 +1,10 @@
-/**
- * Azm database schema.
- *
- * Design principle: Azm stores facts, not scores. Every column is a raw or
- * plainly-derived measurement (a count, a duration, a timestamp). Nothing here
- * is an aggregated "habit score" or "attention score" — those were deliberately
- * rejected because they can't be defended without a documented computation.
- * Risk level (Low/Medium/High) is never stored; it is computed at read-time by
- * the detection engine from these facts, so every claim Azm makes traces back
- * to a row you can point at.
- *
- * Each table maps to something concrete:
- *   tracked_apps   -> the Tracked Apps picker (what Azm watches)
- *   sessions       -> the atomic unit; impulse opens, session length, time-of-day
- *   daily_rollups  -> per-app-per-day aggregates for Insights charts + baselines
- *   app_baselines  -> the "usual" each rule compares against (documented averages)
- *   interventions  -> every intervention shown + the user's response (break rate)
- *   settings       -> quiet hours, daily goal, learning-phase start, etc.
- */
+// Only raw counts, durations and timestamps are stored. Risk level is
+// computed from them at read time by the detection engine.
 
-/** Bump this when the schema changes; initDatabase() migrates on open. */
+/** Bump when the schema changes; initDatabase() migrates on open. */
 export const SCHEMA_VERSION = 1;
 
-/**
- * DDL statements, one per array entry. op-sqlite executes a single statement
- * per execute() call, so the schema is split rather than run as one script.
- */
+// One statement per entry: op-sqlite runs a single statement per call.
 export const SCHEMA_STATEMENTS: string[] = [
   `CREATE TABLE IF NOT EXISTS tracked_apps (
      package_name TEXT PRIMARY KEY,
@@ -46,9 +26,7 @@ export const SCHEMA_STATEMENTS: string[] = [
    )`,
   `CREATE INDEX IF NOT EXISTS idx_sessions_pkg_date ON sessions(package_name, local_date)`,
   `CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(start_time)`,
-  // A session is uniquely identified by its app + foreground timestamp. This
-  // lets re-ingestion of overlapping query windows use INSERT OR IGNORE instead
-  // of creating duplicates.
+  // Lets overlapping re-ingests use INSERT OR IGNORE.
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_unique ON sessions(package_name, start_time)`,
 
   `CREATE TABLE IF NOT EXISTS daily_rollups (
@@ -88,10 +66,6 @@ export const SCHEMA_STATEMENTS: string[] = [
      value TEXT NOT NULL
    )`,
 ];
-
-/* -------------------------------------------------------------------------- */
-/* Row types — the shape each table returns when queried.                     */
-/* -------------------------------------------------------------------------- */
 
 export interface TrackedAppRow {
   package_name: string;

@@ -1,25 +1,10 @@
-/**
- * All detection thresholds live here, named and documented, so every number a
- * rule uses is auditable in one place rather than buried as a magic constant.
- * These are deliberate, defensible defaults — not learned, not weighted — and
- * each maps to a single measurable variable.
- */
-
 /** Trailing days considered when computing an app's baseline. */
 export const BASELINE_WINDOW_DAYS = 14;
 
-/**
- * Furthest back a single ingestion run asks the OS for events. Bounds the query
- * after a long gap (e.g. app reinstalled weeks later) instead of reading
- * everything since the last checkpoint.
- */
-export const MAX_INGEST_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+/** Furthest back one ingest reads, however old the checkpoint is. */
+export const MAX_INGEST_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Days of data required before baseline-dependent rules (impulse opens, long
- * session) are trusted. Below this, Azm is in its "learning phase" and holds
- * those comparisons back rather than flag against an unstable "usual".
- */
+/** Days of data before impulse-open and long-session rules can fire. */
 export const LEARNING_PHASE_DAYS = 7;
 
 /** Opens today must be >= this multiple of the app's usual daily opens to flag. */
@@ -30,7 +15,7 @@ export const IMPULSE_MIN_OPENS = 4;
 /** A session must be >= this multiple of the app's usual session length to flag. */
 export const LONG_SESSION_MULTIPLIER = 2.0;
 /** Absolute floor (ms) so short sessions never flag regardless of ratio. */
-export const LONG_SESSION_MIN_MS = 10 * 60 * 1000; // 10 minutes
+export const LONG_SESSION_MIN_MS = 10 * 60 * 1000;
 
 /** Number of opens in the late-night window needed to flag (any use flags). */
 export const LATE_NIGHT_MIN_OPENS = 1;

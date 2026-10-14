@@ -19,13 +19,12 @@ const EYEBROW: Record<string, string> = {
 
 type InterruptView = 'prompt' | 'why' | 'breathe' | 'confirm';
 
-/** Which kind of break was taken, so the confirmation can speak to it. */
 type BreakKind = 'break' | 'breathe' | 'step_away';
 
 const CONFIRM_COPY: Record<BreakKind, { title: string; body: string }> = {
   break: {
     title: 'You stepped away.',
-    body: 'A small win — your attention is yours again. Azm will keep quiet for a while.',
+    body: 'A small win. Your attention is yours again. Azm will keep quiet for a while.',
   },
   breathe: {
     title: 'That minute was yours.',
@@ -38,16 +37,9 @@ const CONFIRM_COPY: Record<BreakKind, { title: string; body: string }> = {
 };
 
 /**
- * The intervention surface. "Take a break" is always immediately tappable —
- * leaving is the easy path. "Keep scrolling" is held behind a live countdown
- * (decision.frictionSec, which grows with each breach that day), so continuing
- * is a deliberate act rather than a reflex. This is the escalating-friction
- * model: the app never hard-blocks, but a breach costs progressively more.
- *
- * Alongside the main choice it offers two concrete alternatives to scrolling
- * (a one-minute breathing pause, or simply stepping away), a line from the
- * user's own record yesterday, and a "why" view listing the exact rules that
- * fired this intervention. Both alternatives count as an accepted break.
+ * "Take a break" is always tappable. "Keep scrolling" waits out
+ * decision.frictionSec, which grows with each intervention that day.
+ * Breathing and "Step away" both count as an accepted break.
  */
 export function InterruptModal({
   active,
@@ -61,13 +53,12 @@ export function InterruptModal({
   const [breakKind, setBreakKind] = useState<BreakKind>('break');
   const [accepted, setAccepted] = useState(0);
   const [memory, setMemory] = useState<string | null>(null);
-  const [remaining, setRemaining] = useState(0); // seconds left on the gate
+  const [remaining, setRemaining] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const decision = active?.decision;
 
-  // Start / restart the countdown whenever a new intervention appears. The
-  // countdown keeps running while the user reads the "why" view.
+  // Keeps counting down while the "why" view is open.
   useEffect(() => {
     if (!active || !decision) return;
     setView('prompt');
@@ -94,7 +85,6 @@ export function InterruptModal({
     };
   }, [active, decision]);
 
-  /** Records an accepted break and moves on to the given view. */
   function takeBreak(kind: BreakKind, next: InterruptView) {
     if (!active) return;
     recordResponse(active.id, 'accepted_break');
@@ -104,7 +94,6 @@ export function InterruptModal({
   }
 
   function choose(opt: InterventionOption) {
-    // Enforce the gate: an option still counting down can't be taken yet.
     if (opt.delaySec > 0 && remaining > 0) return;
     if (!active) return;
     if (opt.response === 'accepted_break') {
@@ -124,8 +113,7 @@ export function InterruptModal({
       visible={!!active}
       animationType="fade"
       onRequestClose={() => {
-        // Hardware back steps out of the "why" view; elsewhere it is blocked
-        // so the gate can't be skipped.
+        // Back only leaves the "why" view, so it can't skip the countdown.
         if (view === 'why') setView('prompt');
       }}
       statusBarTranslucent>
@@ -188,8 +176,8 @@ export function InterruptModal({
 
             {remaining > 0 && (
               <Text style={styles.frictionNote}>
-                Take a break anytime. Continuing waits a moment — the more you
-                push past your limit today, the longer that pause.
+                Take a break anytime. Continuing waits a moment, and the wait
+                gets longer each time you push past your limit today.
               </Text>
             )}
           </ScrollView>

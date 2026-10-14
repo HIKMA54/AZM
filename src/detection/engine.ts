@@ -23,7 +23,7 @@ export interface DetectionResult {
   date: string;
   riskLevel: RiskLevel;
   learningPhase: { active: boolean; day: number; of: number };
-  rules: RuleResult[]; // every rule evaluated (fired or not) — for transparency
+  rules: RuleResult[]; // fired or not
   firedRules: RuleResult[];
   withinQuietHours: boolean;
 }
@@ -71,11 +71,7 @@ function toMinutes(hhmm: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
-/**
- * Whether `now` falls inside the user's quiet-hours window. Detection still
- * runs during quiet hours; this flag just tells step 4 to hold interventions
- * back. The window may wrap past midnight (e.g. 22:00 -> 07:00).
- */
+/** The window may wrap past midnight (e.g. 22:00 -> 07:00). */
 function isWithinQuietHours(now: number): boolean {
   const start = getSetting('quiet_hours_start');
   const end = getSetting('quiet_hours_end');
@@ -90,23 +86,9 @@ function isWithinQuietHours(now: number): boolean {
 }
 
 /**
- * Runs Azm's rule-based detection for `now`.
- *
- * Pipeline: refresh baselines -> gather today's facts -> evaluate every rule
- * -> derive an overall risk level. Per-app rules (impulse opens, long session)
- * run for each app in scope against that app's own baseline; aggregate rules
- * (late-night, daily goal) run once across all apps in scope.
- *
- * Rollups are NOT refreshed here — the caller's ingestion step
- * (ingestRecentEvents + refreshRollups(touchedDates)) already did that for
- * whatever days it just read, before calling this. Rebuilding the whole
- * rollup table on every detection run would undo the point of a scoped,
- * checkpointed ingest.
- *
- * This function only reads and computes. It stores nothing and shows nothing —
- * deciding whether to actually surface an intervention (and respecting quiet
- * hours) is step 4's responsibility, which is why the result carries the raw
- * rule outcomes and a quiet-hours flag rather than acting on them here.
+ * Evaluates every rule for `now` and derives a risk level. Per-app rules use
+ * each app's own baseline; late-night and daily-goal run across all scoped
+ * apps. Callers refresh rollups first. Read-only apart from baselines.
  */
 export function runDetection(now: number = Date.now()): DetectionResult {
   refreshBaselines(now);

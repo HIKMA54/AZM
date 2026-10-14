@@ -10,7 +10,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, space, radius, type } from '../theme/theme';
 
-/** Full-screen scrollable container that respects the status bar / notch. */
 export function Screen({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
@@ -40,12 +39,10 @@ export function Card({
   );
 }
 
-/** Small uppercase section eyebrow — labels a section, never decorates. */
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return <Text style={[type.eyebrow, styles.sectionLabel]}>{children}</Text>;
 }
 
-/** A single behavioral stat: a monospace number over a plain label. */
 export function StatTile({
   value,
   unit,

@@ -60,13 +60,11 @@ export default function SettingsScreen() {
   const [trackedCount, setTrackedCount] = useState<number>(countTracked());
   const [monitoring, setMonitoring] = useState<boolean>(Monitor.isEnabled());
 
-  // Reconcile the toggle with whether the service is actually running.
   useEffect(() => {
     Monitor.isRunning().then(r => setMonitoring(r || Monitor.isEnabled()));
   }, []);
 
-  // "Display over other apps" is granted outside Azm, so re-check it whenever
-  // the user comes back from the system settings screen.
+  // Granted in system settings, so re-check on return.
   const [overApps, setOverApps] = useState(false);
   useEffect(() => {
     const refresh = () => Monitor.canShowOverApps().then(setOverApps);
@@ -80,12 +78,12 @@ export default function SettingsScreen() {
   const wrapHour = (h: number) => (h + 24) % 24;
 
   async function toggleMonitoring(on: boolean) {
-    setMonitoring(on); // optimistic
+    setMonitoring(on);
     try {
       if (on) await Monitor.enable();
       else await Monitor.disable();
     } catch {
-      setMonitoring(!on); // revert on failure
+      setMonitoring(!on);
     }
   }
 
@@ -140,7 +138,7 @@ export default function SettingsScreen() {
               <Text style={[type.heading, { color: colors.ink }]}>Tracked apps</Text>
               <Text style={[type.caption, styles.caption]}>
                 {trackedCount === 0
-                  ? 'None picked yet — Azm is watching everything it sees.'
+                  ? 'None picked yet, so Azm is watching everything it sees.'
                   : `${trackedCount} app${trackedCount === 1 ? '' : 's'} chosen.`}
               </Text>
             </View>
@@ -196,7 +194,7 @@ export default function SettingsScreen() {
       <SectionLabel>Quiet hours</SectionLabel>
       <Card>
         <Text style={[type.caption, styles.caption, { marginBottom: space.md }]}>
-          Azm stays silent during these hours — no nudges, even if something spikes.
+          No nudges during these hours, even if something spikes.
         </Text>
         <View style={styles.settingRow}>
           <Text style={[type.body, { color: colors.ink }]}>From</Text>

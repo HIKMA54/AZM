@@ -12,13 +12,8 @@ import android.provider.Settings
 import androidx.core.app.NotificationCompat
 
 /**
- * Notification channels and builders for Azm's background monitoring.
- *
- * Two channels, deliberately different in weight:
- *   - monitor: IMPORTANCE_MIN, the silent "Azm is watching" ongoing notice the
- *     foreground service requires. It must feel invisible — Azm isn't here to
- *     add to the pile.
- *   - intervention: IMPORTANCE_HIGH, the actual nudge when the app is closed.
+ * monitor: the silent ongoing notification the foreground service needs.
+ * intervention: the high-priority nudge posted when the app is closed.
  */
 object AzmNotifications {
     const val MONITOR_CHANNEL = "azm_monitor"
@@ -56,7 +51,6 @@ object AzmNotifications {
         )
     }
 
-    /** The ongoing, silent notification that keeps the foreground service alive. */
     fun buildMonitorNotification(context: Context): Notification {
         return NotificationCompat.Builder(context, MONITOR_CHANNEL)
             .setContentTitle("Azm is noticing your patterns")
@@ -68,7 +62,6 @@ object AzmNotifications {
             .build()
     }
 
-    /** A nudge shown when the app is closed and a rule fired. */
     fun postIntervention(context: Context, title: String, body: String) {
         ensureChannels(context)
         val notif = NotificationCompat.Builder(context, INTERVENTION_CHANNEL)
@@ -84,11 +77,9 @@ object AzmNotifications {
             .notify(interventionId++, notif)
     }
 
-    /** True when the user has allowed Azm to "Display over other apps". */
     fun canDrawOverlays(context: Context): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
 
-    /** Opens the system screen where the user grants "Display over other apps". */
     fun openOverlaySettings(context: Context) {
         val intent = Intent(
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -98,11 +89,9 @@ object AzmNotifications {
     }
 
     /**
-     * Brings Azm to the front over whatever app is open, so the JS side can show
-     * the pending intervention full-screen. Android only allows this from the
-     * background when "Display over other apps" is granted. MainActivity is
-     * singleTask, so an existing Azm task is reused rather than duplicated.
-     * Returns false if it could not, so the caller can fall back to a notification.
+     * Brings Azm to the front so JS can show the pending intervention. Needs the
+     * overlay permission when launched from the background. Returns false if it
+     * couldn't, so the caller can post a notification instead.
      */
     fun openInterrupt(context: Context): Boolean {
         if (!canDrawOverlays(context)) return false

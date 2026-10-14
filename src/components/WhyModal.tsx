@@ -7,15 +7,6 @@ import { RuleResult } from '../detection/rules';
 import { displayAppName } from '../utils/appNames';
 import { getTrackedNameMap } from '../database/trackedAppsRepo';
 
-/**
- * "Why you saw this" — the transparency screen. It runs the same detection the
- * rest of the app uses and lists, in plain language, every rule that fired with
- * the exact numbers behind it. This is the visible form of the project's core
- * principle: Azm shows facts, not an opaque score, and every judgment can be
- * traced to a named rule the user can read.
- */
-
-/** One fired rule -> a headline + the evidence line beneath it. */
 function describe(
   rule: RuleResult,
   trackedNames: Map<string, string>,
@@ -48,11 +39,7 @@ function describe(
   }
 }
 
-/**
- * The list of fired rules with the numbers behind each, plus the on-device
- * note. Shared by the dashboard's WhyModal (which runs detection fresh) and the
- * interrupt (which passes the exact rules that triggered that intervention).
- */
+/** Shared by WhyModal (fresh detection) and the interrupt (the rules that fired it). */
 export function WhyContent({ rules }: { rules: RuleResult[] }) {
   if (rules.length === 0) {
     return (
@@ -60,7 +47,7 @@ export function WhyContent({ rules }: { rules: RuleResult[] }) {
         <Text style={[type.display, styles.title]}>Nothing is flagged right now.</Text>
         <Text style={[type.body, styles.calm]}>
           Azm only speaks up when one of its rules actually matches. When it does, this screen
-          shows you exactly which ones — never a score you can't check.
+          shows you exactly which ones.
         </Text>
         <PrivacyNote />
       </>
@@ -108,7 +95,6 @@ export function WhyModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  /** When given, shows an "Adjust nudge settings" button that calls it. */
   onAdjustSettings?: () => void;
 }) {
   const insets = useSafeAreaInsets();

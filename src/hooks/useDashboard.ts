@@ -18,7 +18,7 @@ export interface AppUsage {
 }
 
 export interface DashboardModel {
-  headline: string; // the plain-language daily read
+  headline: string;
   subline: string;
   riskLevel: RiskLevel;
   learningPhase: { active: boolean; day: number; of: number };
@@ -26,7 +26,7 @@ export interface DashboardModel {
   longestMin: number;
   totalMin: number;
   breaks: { accepted: number; total: number };
-  insights: string[]; // plain-language lines from fired rules
+  insights: string[];
   topApps: AppUsage[];
 }
 
@@ -39,17 +39,16 @@ function timeOfDayGreeting(now: number): string {
   return 'Good evening';
 }
 
-/** Turns a fired rule into one plain-language line for the dashboard. */
 function insightLine(rule: any, trackedNames: Map<string, string>): string {
   const d = rule.detail ?? {};
   const app = displayAppName(rule.packageName, trackedNames);
   switch (rule.type) {
     case 'daily_goal':
-      return `You've passed your ${d.goalMin}-minute goal — ${d.usedMin} minutes so far.`;
+      return `You've passed your ${d.goalMin}-minute goal: ${d.usedMin} minutes so far.`;
     case 'long_session':
       return `A long stretch on ${app}: ${d.sessionMin} minutes, more than your usual ${d.usualMin}.`;
     case 'impulse_opens':
-      return `You opened ${app} ${d.opens} times — more than your usual ${d.usual}.`;
+      return `You opened ${app} ${d.opens} times, more than your usual ${d.usual}.`;
     case 'late_night':
       return `You were still scrolling after ${d.sinceHour}:00.`;
     default:
@@ -70,7 +69,7 @@ function headlineFor(
   if (risk === 'high') {
     return {
       headline: "Today's been a heavy day.",
-      subline: 'A few patterns pulled hard at your attention. No judgment — just worth seeing.',
+      subline: 'A few patterns pulled hard at your attention. No judgment, just worth seeing.',
     };
   }
   if (risk === 'medium') {
@@ -105,9 +104,7 @@ export function useDashboard() {
       const date = toLocalDate(end);
       const trackedNames = getTrackedNameMap();
 
-      // Today's figures are scoped to the exact same app list detection just
-      // used — tracked apps only (or every observed app minus the home
-      // launcher/System UI/Azm, before anything's been tracked).
+      // Same app scope detection used.
       const scoped = getScopedApps();
       const placeholders = scoped.map(() => '?').join(',');
 

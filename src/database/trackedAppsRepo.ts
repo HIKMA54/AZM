@@ -1,23 +1,12 @@
 import { query, run } from './db';
 import { UsageStatsService } from '../services/UsageStats';
 
-/**
- * The tracked_apps table records which apps the user has chosen for Azm to
- * watch. Detection scopes to these when any exist (see getScopedApps); until
- * the user picks any, detection falls back to every app it has observed. So an
- * empty table means "watch everything", and choosing apps narrows the focus.
- */
-
 const SYSTEM_EXCLUSIONS_SETTING_KEY = 'system_excluded_packages';
 
 /**
- * Refreshes the cached set of packages that must never be tracked or counted
- * — the device's current home app, System UI, and Azm itself — resolved via
- * the native module (PackageManager.resolveActivity for the home app; no
- * hardcoded manufacturer package names). Persisted to `settings` rather than
- * kept only in memory so the headless background task, which runs in its own
- * fresh JS context with no app UI, can read it back synchronously without a
- * second native round-trip. Call once per foreground app start.
+ * Caches the launcher / System UI / Azm package list in `settings`, so the
+ * headless task (a separate JS context) can read it synchronously. Call once
+ * per app start.
  */
 export async function primeSystemExclusions(): Promise<void> {
   const excluded = await UsageStatsService.getSystemExcludedPackages();
@@ -28,14 +17,6 @@ export async function primeSystemExclusions(): Promise<void> {
   );
 }
 
-/**
- * The hard-excluded package set (home launcher / System UI / Azm), read back
- * from the cache primeSystemExclusions() persisted. Used at ingestion and
- * rollup time so stored data never includes them in the first place — Azm's
- * own historical data for genuinely untracked apps (e.g. an app the user
- * hasn't chosen to track yet) is deliberately left alone, so that tracking it
- * later can draw on real history rather than starting from zero.
- */
 export function getSystemExclusions(): Set<string> {
   const raw = query<{ value: string }>(
     'SELECT value FROM settings WHERE key = ?',
@@ -50,11 +31,8 @@ export function getSystemExclusions(): Set<string> {
 }
 
 /**
- * The single definition of which apps feed Azm's counts, minutes, rules,
- * baseline and risk: the user's tracked apps if any have been chosen,
- * otherwise every app Azm has observed — in both cases minus the home
- * launcher / System UI / Azm itself. Every screen and rule reads this same
- * list rather than each re-deriving its own scope.
+ * Apps that feed every count, rule and screen: the tracked apps, or every
+ * observed app if none are tracked, minus the system exclusions.
  */
 export function getScopedApps(): string[] {
   const excluded = getSystemExclusions();
@@ -72,11 +50,7 @@ export function getScopedApps(): string[] {
   return observed.filter(pkg => !excluded.has(pkg));
 }
 
-/**
- * Package -> real app label, captured from PackageManager at the moment the
- * app was tracked (see setTracked). The single label source every screen
- * should read from instead of guessing a name from the package id.
- */
+/** Package -> label saved when the app was tracked. */
 export function getTrackedNameMap(): Map<string, string> {
   const rows = query<{ package_name: string; app_name: string }>(
     'SELECT package_name, app_name FROM tracked_apps',
@@ -89,7 +63,6 @@ export interface TrackedApp {
   appName: string;
 }
 
-/** Package names the user is actively tracking. */
 export function getTrackedSet(): Set<string> {
   const rows = query<{ package_name: string }>(
     'SELECT package_name FROM tracked_apps WHERE is_tracked = 1',
@@ -105,7 +78,6 @@ export function countTracked(): number {
   );
 }
 
-/** Turns tracking on/off for one app (upsert — keeps history if toggled off). */
 export function setTracked(
   packageName: string,
   appName: string,

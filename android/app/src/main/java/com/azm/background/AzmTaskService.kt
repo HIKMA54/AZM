@@ -5,18 +5,14 @@ import com.facebook.react.HeadlessJsTaskService
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
 
-/**
- * Runs the registered 'AzmBackground' JS task with no UI. This is what lets the
- * background service reuse the exact detection + intervention engine written in
- * TypeScript, instead of reimplementing any of it in Kotlin.
- */
+/** Runs the 'AzmBackground' headless JS task registered in index.js. */
 class AzmTaskService : HeadlessJsTaskService() {
     override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig {
         return HeadlessJsTaskConfig(
-            "AzmBackground", // must match AppRegistry.registerHeadlessTask in index.js
+            "AzmBackground",
             Arguments.createMap(),
-            30000, // timeout (ms) — the check is short
-            true, // allowed to run even when the app is in the foreground
+            30000,
+            true, // allow in foreground
         )
     }
 }

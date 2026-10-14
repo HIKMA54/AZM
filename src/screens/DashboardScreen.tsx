@@ -17,14 +17,14 @@ export default function DashboardScreen() {
         <Text style={[type.eyebrow, styles.eyebrow]}>AZM</Text>
         <Text style={[type.display, styles.headline]}>Azm needs one thing to begin.</Text>
         <Text style={[type.body, styles.subline]}>
-          To notice your patterns, Azm reads which apps you open and for how long — all on your
-          phone, nothing leaves it. Turn on Usage Access to start.
+          To notice your patterns, Azm reads which apps you open and for how long. It all stays on
+          your phone. Turn on Usage Access to start.
         </Text>
         <TouchableOpacity style={styles.primaryBtn} onPress={openUsageSettings}>
           <Text style={styles.primaryBtnText}>Turn on Usage Access</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.ghostBtn} onPress={refresh}>
-          <Text style={styles.ghostBtnText}>I've done it — check again</Text>
+          <Text style={styles.ghostBtnText}>I've done it, check again</Text>
         </TouchableOpacity>
       </Screen>
     );
@@ -49,7 +49,6 @@ export default function DashboardScreen() {
         <Text style={[type.eyebrow, styles.eyebrow]}>{greeting.toUpperCase()}</Text>
       </View>
 
-      {/* Signature: the plain-language daily read */}
       <Text style={[type.display, styles.headline]}>{model.headline}</Text>
       <Text style={[type.body, styles.subline]}>{model.subline}</Text>
 
@@ -59,7 +58,6 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* Behavioral evidence — opens lead, time is secondary */}
       <SectionLabel>Today</SectionLabel>
       <Card>
         <View style={styles.statRow}>
@@ -80,7 +78,6 @@ export default function DashboardScreen() {
         <Text style={styles.whyLink}>Why you saw this ›</Text>
       </TouchableOpacity>
 
-      {/* What stood out */}
       <SectionLabel>What stood out</SectionLabel>
       {model.insights.length === 0 ? (
         <Card tone={colors.surfaceSunken}>
@@ -99,7 +96,6 @@ export default function DashboardScreen() {
         </Card>
       )}
 
-      {/* Where the time went — behavioral (opens) first */}
       {model.topApps.length > 0 && (
         <>
           <SectionLabel>By app</SectionLabel>

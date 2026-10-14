@@ -16,16 +16,7 @@ export interface ActiveIntervention {
   id: number;
 }
 
-/**
- * Watches for interventions from inside the app: it re-checks on launch and
- * every time the app returns to the foreground. While the app is closed the
- * background task makes the same decision and posts a notification; when the
- * user then opens Azm, that unanswered intervention is shown here full-screen.
- *
- * Guards: it won't run while a check is in flight or while an intervention is
- * already on screen, and decideIntervention's own cooldown/quiet-hours/cap
- * rules still gate whether anything actually shows.
- */
+/** Checks on launch and whenever the app returns to the foreground. */
 export function useInterventionWatcher() {
   const [active, setActive] = useState<ActiveIntervention | null>(null);
   const busy = useRef(false);
@@ -39,8 +30,7 @@ export function useInterventionWatcher() {
       const { touchedDates } = await ingestRecentEvents(end);
       if (touchedDates.length > 0) refreshRollups(touchedDates);
       const detection = runDetection(end);
-      // An unanswered intervention (e.g. the notification the user just
-      // tapped) comes first; otherwise its own cooldown would hide it.
+      // Checked first, or its own cooldown would hide it.
       const pending = resumePendingIntervention(detection, end);
       if (pending) {
         setActive(pending);

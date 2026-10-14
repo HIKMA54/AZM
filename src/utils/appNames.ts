@@ -1,14 +1,6 @@
 import { UsageStatsService } from '../services/UsageStats';
 
-/**
- * Single label source for every screen: tracked_apps.app_name (captured from
- * PackageManager.getApplicationLabel at tracking time — see
- * trackedAppsRepo.getTrackedNameMap) is checked first, so the common case
- * never calls the native side at all. A package with no cached name (not yet
- * tracked) gets a one-time native lookup, cached here in memory for the rest
- * of the session. Only a package that can't be resolved at all (uninstalled)
- * falls back to a name guessed from its package id.
- */
+// Lookup order: tracked_apps name, this cache, native label, package-id guess.
 const sessionLabelCache = new Map<string, string>();
 
 function prettyName(pkg: string): string {
@@ -16,11 +8,7 @@ function prettyName(pkg: string): string {
   return last.charAt(0).toUpperCase() + last.slice(1);
 }
 
-/**
- * Synchronous label for places that can't await the native lookup (rule copy,
- * intervention text). Same order as resolveAppName minus the native call:
- * tracked name, then any label already resolved this session, then the guess.
- */
+/** Like resolveAppName but synchronous, so it skips the native lookup. */
 export function displayAppName(
   packageName: string | null,
   trackedNames: Map<string, string>,
@@ -49,9 +37,7 @@ export async function resolveAppName(
       sessionLabelCache.set(packageName, label);
       return label;
     }
-  } catch {
-    // fall through to the package-derived guess
-  }
+  } catch {}
 
   return prettyName(packageName);
 }

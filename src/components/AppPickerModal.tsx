@@ -15,11 +15,6 @@ import { UsageStatsService } from '../services/UsageStats';
 import { AppInfo } from '../services/usageTypes';
 import { getTrackedSet, setTracked } from '../database/trackedAppsRepo';
 
-/**
- * Full-screen app picker built on React Native's own Modal — no navigation
- * stack or list library needed. Lists the phone's launchable apps (from the
- * native module) and lets the user toggle which ones Azm watches.
- */
 export function AppPickerModal({
   visible,
   onClose,

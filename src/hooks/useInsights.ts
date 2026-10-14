@@ -29,8 +29,7 @@ export function useInsights() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Best-effort: pull the latest events so today is current. Historical
-      // insights still render from stored data if access isn't granted.
+      // Best-effort; stored history still renders without usage access.
       try {
         if (await UsageStatsService.hasUsageAccess()) {
           const { touchedDates } = await ingestRecentEvents(Date.now());

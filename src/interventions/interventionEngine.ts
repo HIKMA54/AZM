@@ -45,7 +45,6 @@ export interface InterventionDecision {
   title: string;
   body: string;
   options: InterventionOption[];
-  /** Friction applied to "keep scrolling" this time (for copy/telemetry). */
   frictionSec: number;
 }
 
@@ -57,11 +56,7 @@ function pickPrimary(fired: RuleResult[]): RuleResult | null {
   return fired[0] ?? null;
 }
 
-/**
- * Cooldown depends on the LAST response: a taken break earns real quiet, while
- * refusing it brings Azm back sooner. This is the consequence half of the
- * breach model — the friction on the button is the other half.
- */
+/** Based on the last response: longer after a break, shorter after continuing. */
 function cooldownMinutes(): number {
   switch (getLastResponse()) {
     case 'accepted_break':
@@ -73,11 +68,7 @@ function cooldownMinutes(): number {
   }
 }
 
-/**
- * Escalating friction: the "keep scrolling" delay grows with each breach already
- * shown today, capped so it never becomes a de-facto lockout. Leaving is always
- * instant; only continuing costs time, and it costs more the more it recurs.
- */
+/** "Keep scrolling" delay: grows with each intervention today, up to the cap. */
 function frictionSeconds(
   now: number,
   priorToday: number = countInterventionsToday(now),
@@ -95,7 +86,7 @@ function copyFor(trigger: RuleResult): { title: string; body: string } {
     case 'daily_goal':
       return {
         title: "You've reached today's goal",
-        body: `That's ${d.usedMin} minutes today — ${d.overMin} over your ${d.goalMin}-minute goal. A good moment to pause?`,
+        body: `That's ${d.usedMin} minutes today, ${d.overMin} over your ${d.goalMin}-minute goal. A good moment to pause?`,
       };
     case 'long_session':
       return {
@@ -105,7 +96,7 @@ function copyFor(trigger: RuleResult): { title: string; body: string } {
     case 'impulse_opens':
       return {
         title: 'Opening a lot today',
-        body: `You've opened ${app} ${d.opens} times — more than your usual ${d.usual}. Take a breather?`,
+        body: `You've opened ${app} ${d.opens} times, more than your usual ${d.usual}. Take a breather?`,
       };
     case 'late_night':
       return {
@@ -118,7 +109,6 @@ function copyFor(trigger: RuleResult): { title: string; body: string } {
 }
 
 function optionsFor(level: InterventionLevel, frictionSec: number): InterventionOption[] {
-  // "Take a break" is always immediate; continuing carries the friction delay.
   if (level === 'interrupt') {
     return [
       { label: 'Take a break', response: 'accepted_break', delaySec: 0 },
@@ -139,9 +129,8 @@ function levelForRisk(risk: DetectionResult['riskLevel']): InterventionLevel {
 }
 
 /**
- * Decides whether and how to intervene. Reads the log for cooldown/cap/friction
- * but writes nothing, so it is safe to call freely. Gating order: a rule fired,
- * not quiet hours, the response-based cooldown elapsed, the daily cap not hit.
+ * Read-only. Skips when nothing fired, in quiet hours, during cooldown, or
+ * once the daily cap is hit.
  */
 export function decideIntervention(
   result: DetectionResult,
@@ -207,15 +196,9 @@ export function presentIntervention(
 }
 
 /**
- * Re-opens an intervention that was logged but never answered, most often one
- * the background task posted as a notification. Without this, tapping that
- * notification would open Azm into the cooldown the notification itself
- * started, and the full-screen interrupt would never appear.
- *
- * The level comes from the current detection (the notification didn't store
- * one), and the friction is what it would have been when the intervention was
- * first shown, so reopening it neither raises nor lowers the cost of
- * continuing. Returns null when nothing is pending.
+ * Reopens a logged but unanswered intervention, usually one sent as a
+ * notification. Otherwise the cooldown it started would hide it when the user
+ * opens Azm. Friction is recomputed as of when it was first shown.
  */
 export function resumePendingIntervention(
   result: DetectionResult,

@@ -1,7 +1,3 @@
-/**
- * An intervention posted as a background notification must reappear full-screen
- * when Azm is opened, instead of being hidden by the cooldown it started.
- */
 jest.mock('../src/services/UsageStats', () => ({
   UsageStatsService: { getAppLabel: jest.fn() },
 }));

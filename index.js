@@ -9,5 +9,4 @@ import backgroundTask from './src/background/backgroundTask';
 
 AppRegistry.registerComponent(appName, () => App);
 
-// Runs headlessly when the foreground service ticks (see AzmTaskService.kt).
 AppRegistry.registerHeadlessTask('AzmBackground', () => backgroundTask);

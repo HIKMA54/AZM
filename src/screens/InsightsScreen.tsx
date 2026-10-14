@@ -8,7 +8,6 @@ import { DaySeries } from '../detection/history';
 const RIBBON_H = 46;
 const BAR_H = 110;
 
-/** Signature element: one calm cell per day, colored by that day's risk. */
 function RiskRibbon({ series }: { series: DaySeries[] }) {
   return (
     <View>
@@ -46,7 +45,6 @@ function RiskRibbon({ series }: { series: DaySeries[] }) {
   );
 }
 
-/** Plain-View bar chart of a behavioral value per day. */
 function BarChart({
   series,
   valueOf,

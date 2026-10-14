@@ -1,16 +1,11 @@
 import { query, run } from './db';
 
-/**
- * Settings are a simple key-value table. Typed getters/setters wrap the raw
- * string storage so callers work with numbers/strings, not serialization.
- * Keys used by Azm are listed in SettingKey for discoverability.
- */
 export type SettingKey =
-  | 'daily_goal_minutes' // user's daily social-time goal
-  | 'quiet_hours_start' // 'HH:MM', interventions suppressed inside this window
+  | 'daily_goal_minutes'
+  | 'quiet_hours_start' // 'HH:MM'
   | 'quiet_hours_end' // 'HH:MM'
-  | 'late_night_start_hour' // integer hour (0-23) marking the late-night window start
-  | 'learning_phase_start'; // 'YYYY-MM-DD' the 7-day baseline learning phase began
+  | 'late_night_start_hour' // 0-23
+  | 'learning_phase_start'; // 'YYYY-MM-DD'
 
 export function getSetting(key: SettingKey): string | null {
   const rows = query<{ value: string }>(
@@ -39,17 +34,13 @@ export function setSettingNumber(key: SettingKey, value: number): void {
   setSetting(key, String(value));
 }
 
-/**
- * Seeds sensible defaults the first time the app runs. Only writes a key if it
- * is absent, so it never overwrites a choice the user has already made.
- * These are starting points, not fixed rules — the Settings screen edits them.
- */
+/** Writes defaults for any key that isn't set yet. */
 export function seedDefaultSettings(): void {
   const defaults: Array<[SettingKey, string]> = [
-    ['daily_goal_minutes', '120'], // 2h default goal
+    ['daily_goal_minutes', '120'],
     ['quiet_hours_start', '22:00'],
     ['quiet_hours_end', '07:00'],
-    ['late_night_start_hour', '23'], // opens at/after 23:00 count as late-night
+    ['late_night_start_hour', '23'],
   ];
   for (const [key, value] of defaults) {
     if (getSetting(key) === null) setSetting(key, value);

@@ -17,9 +17,7 @@ export default function App() {
       try {
         initDatabase();
         seedDefaultSettings();
-        // Resolves and caches the home launcher / System UI / Azm exclusion
-        // set before anything reads it, so the very first detection run and
-        // Today's first render are already scoped correctly.
+        // Must run before the first detection pass reads the exclusions.
         await primeSystemExclusions();
         setDbReady(true);
       } catch (e: any) {

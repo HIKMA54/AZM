@@ -1,17 +1,11 @@
 import { AppSession, UsageEvent, UsageEventType } from '../services/usageTypes';
 
 /**
- * Reconstructs discrete app sessions from a flat list of foreground/background
- * events. A session is a MOVE_TO_FOREGROUND paired with the next
- * MOVE_TO_BACKGROUND for the same package.
- *
- * This is the seam between raw OS data and Azm's detection engine: impulse
- * opens (count of sessions), session length (duration), time-of-day and
- * late-night use (session.start) are all read off the sessions produced here,
- * so no behavioural claim depends on anything the sessionizer can't show.
+ * Pairs each foreground event with the next background event for the same
+ * package.
  *
  * @param events    raw events, in any order
- * @param windowEnd epoch ms used to cap a session still open at query time
+ * @param windowEnd end time for a session still open at query time
  */
 export function sessionize(
   events: UsageEvent[],
@@ -32,8 +26,7 @@ export function sessionize(
 
     for (const e of list) {
       if (e.eventType === UsageEventType.Foreground) {
-        // A second foreground without an intervening background can happen;
-        // keep the earliest start so the session isn't artificially shortened.
+        // Repeated foregrounds happen; keep the earliest.
         if (openStart === null) openStart = e.timestamp;
       } else if (e.eventType === UsageEventType.Background) {
         if (openStart !== null) {
@@ -43,7 +36,6 @@ export function sessionize(
       }
     }
 
-    // Still in the foreground at the end of the window: cap the session.
     if (openStart !== null) {
       sessions.push(makeSession(packageName, openStart, windowEnd, true));
     }
